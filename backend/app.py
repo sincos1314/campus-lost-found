@@ -170,7 +170,7 @@ class Notification(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    type = db.Column(db.String(20), default='info')  # info, success, warning
+    type = db.Column(db.String(20), default='info')  
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     related_item_id = db.Column(db.Integer, db.ForeignKey('item.id'))
@@ -193,7 +193,7 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text)  # 文字消息内容
-    message_type = db.Column(db.String(20), default='text')  # text/image/system
+    message_type = db.Column(db.String(20), default='text')  
     image_path = db.Column(db.String(200))  # 图片路径
     is_read = db.Column(db.Boolean, default=False)  # 是否已读
     is_recalled = db.Column(db.Boolean, default=False)  # 是否已撤回
@@ -326,7 +326,7 @@ with app.app_context():
         conn.close()
     except Exception as e:
         print(f'avatar_path migration skipped: {e}')
-    # quick migration for report extra columns
+
     try:
         import sqlite3
         conn = sqlite3.connect(os.path.join(basedir, 'lost_found.db'))
@@ -575,9 +575,9 @@ def create_report():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             evidence_path = filename
-    # support both form and json
+
     data = request.form.to_dict() if evidence_path is not None else (request.json or {})
-    # duplicate prevention for open report
+
     existing = Report.query.filter_by(
         reporter_id=user_id,
         target_user_id=data.get('target_user_id'),
@@ -598,7 +598,7 @@ def create_report():
     )
     db.session.add(report)
     db.session.commit()
-    # notify admins
+
     admins = User.query.filter_by(role='admin').all()
     cat_map = {'spam': '垃圾信息', 'abuse': '骚扰/辱骂', 'fake': '虚假信息', 'other': '其他'}
     sev_map = {'low': '低', 'medium': '中', 'high': '高'}
@@ -1648,35 +1648,6 @@ def send_image_message(conversation_id):
     receiver_id = conversation.user2_id if conversation.user1_id == user_id else conversation.user1_id
     if getattr(user, 'is_banned', False) and (user.banned_by is None or receiver_id != user.banned_by):
         return jsonify({'message': '账户已被封禁，只能联系封禁管理员'}), 403
-        
-        # 创建消息
-        message = Message(
-            conversation_id=conversation_id,
-            sender_id=user_id,
-            receiver_id=receiver_id,
-            content='[图片]',
-            message_type='image',
-            image_path=filename
-        )
-        
-        db.session.add(message)
-        
-        # 更新会话的最后消息
-        conversation.last_message = '[图片]'
-        conversation.last_message_time = datetime.now()
-        
-        db.session.commit()
-        
-        # 创建系统通知
-        sender = User.query.get(user_id)
-        create_notification(
-            receiver_id,
-            '新消息',
-            f'{sender.username} 给你发送了一张图片',
-            'info'
-        )
-        
-        return jsonify(message.to_dict(user_id)), 201
     
     return jsonify({'message': '不支持的图片格式'}), 400
 
