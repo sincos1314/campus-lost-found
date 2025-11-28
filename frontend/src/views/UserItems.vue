@@ -37,7 +37,7 @@
       <el-col v-for="item in items" :key="item.id" :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="item-card" shadow="hover" @click="goToDetail(item.id)">
           <div class="item-image">
-            <img v-if="item.image_url" :src="`http://localhost:5000${item.image_url}`" />
+            <img v-if="item.image_url" :src="absoluteUrl(item.image_url)" />
             <div v-else class="no-image">
               <el-icon :size="50"><Picture /></el-icon>
               <span>暂无图片</span>
@@ -65,7 +65,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import request from '../utils/request'
+import request, { absoluteUrl, previewList } from '../utils/request'
 import { getToken } from '../utils/auth'
 import { Refresh, Picture, User } from '@element-plus/icons-vue'
 

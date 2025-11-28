@@ -2,7 +2,7 @@
   <div class="profile-container">
     <el-row :gutter="20">
       <el-col :xs="24" :md="8">
-        <el-card class="user-card" shadow="never">
+        <el-card class="user-card card-glass hover-rise" shadow="never">
           <div class="user-avatar">
             <el-avatar :size="100" :src="user?.avatar_url ? `http://localhost:5000${user.avatar_url}` : ''">
               <el-icon v-if="!user?.avatar_url" :size="50"><User /></el-icon>
@@ -28,7 +28,7 @@
       </el-col>
 
       <el-col :xs="24" :md="16">
-        <el-card class="profile-card" shadow="never">
+        <el-card class="profile-card card-glass" shadow="never">
           <template #header>
             <span>个人资料</span>
           </template>
@@ -132,7 +132,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import request from '../utils/request'
+import request, { apiOrigin, absoluteUrl } from '../utils/request'
 import { setUser, getToken } from '../utils/auth'
 
 const formRef = ref()

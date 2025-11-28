@@ -1,6 +1,6 @@
 <template>
   <div class="chat-container">
-    <el-card class="chat-card">
+    <el-card class="chat-card card-glass">
       <!-- 聊天头部 -->
       <template #header>
         <div class="chat-header">
@@ -23,7 +23,7 @@
         <div
           v-for="(msg, idx) in messages"
           :key="msg.id"
-          :class="['message-item', msg.is_sender ? 'sent' : 'received']"
+          :class="['message-item fade-in-up', msg.is_sender ? 'sent' : 'received']"
         >
           <div v-if="shouldShowDate(idx)" class="date-separator">
             {{ formatDate(msg.created_at) }}
@@ -53,7 +53,7 @@
                 :src="imageUrl(msg)"
                 :preview-src-list="[imageUrl(msg)]"
                 fit="cover"
-                class="message-image"
+                class="message-image image-zoom"
               />
             </div>
 
@@ -96,7 +96,7 @@
       <!-- 输入区域 -->
       <div class="input-area">
         <el-upload
-          :action="`http://localhost:5000/api/conversations/${conversationId}/send-image`"
+          :action="`${apiOrigin}/api/conversations/${conversationId}/send-image`"
           :headers="{ Authorization: `Bearer ${getToken()}` }"
           name="image"
           :show-file-list="false"
@@ -323,7 +323,7 @@ const shouldShowDate = (idx) => {
 
 const imageUrl = (msg) => {
   const token = getToken();
-  const base = `http://localhost:5000${msg.image_url}`;
+  const base = absoluteUrl(msg.image_url);
   return `${base}?token=${encodeURIComponent(token || '')}`;
 };
 
@@ -345,7 +345,7 @@ const initWebSocket = () => {
   if (!token) return;
 
   // 连接WebSocket服务器
-  socket.value = io("http://localhost:5000", {
+  socket.value = io(import.meta.env.VITE_SOCKET_ORIGIN || apiOrigin, {
     query: { token }
   });
 

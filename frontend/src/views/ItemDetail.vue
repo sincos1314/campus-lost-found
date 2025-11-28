@@ -14,7 +14,7 @@
             <el-image
               v-if="item.image_url"
               :src="fullImageUrl"
-              :preview-src-list="[fullImageUrl]"
+              :preview-src-list="previewList(item.image_url)"
               fit="cover"
               class="item-image"
             >
@@ -216,7 +216,8 @@ const timeline = ref([]);
 const shareVisible = ref(false);
 const qrUrl = ref("");
 const reportVisible = ref(false);
-const fullImageUrl = computed(() => item.value?.image_url ? `http://localhost:5000${item.value.image_url}` : '')
+import { absoluteUrl, previewList } from '../utils/request'
+const fullImageUrl = computed(() => item.value?.image_url ? absoluteUrl(item.value.image_url) : '')
 
 // 获取当前用户ID
 const getCurrentUserId = () => {

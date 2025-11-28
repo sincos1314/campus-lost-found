@@ -1,5 +1,5 @@
 <template>
-  <div class="list-container">
+  <div class="list-container gradient-bg">
     <el-card class="filter-card" shadow="never">
       <el-row :gutter="15">
         <el-col :xs="24" :sm="12" :md="8">
@@ -56,7 +56,7 @@
             </el-button>
           </div>
         </el-col>
-        
+
         <el-col :xs="24" :sm="12" :md="8">
           <el-date-picker
             v-model="filters.dateRange"
@@ -113,11 +113,16 @@
         :md="8"
         :lg="6"
       >
-        <el-card class="item-card" shadow="hover" @click="goToDetail(item.id)">
+        <el-card
+          class="item-card card-glass hover-rise fade-in-up"
+          shadow="hover"
+          @click="goToDetail(item.id)"
+        >
           <div class="item-image">
             <img
               v-if="item.image_url"
-              :src="`http://localhost:5000${item.image_url}`"
+              :src="absoluteUrl(item.image_url)"
+              class="image-zoom"
             />
             <div v-else class="no-image">
               <el-icon :size="50"><Picture /></el-icon>
@@ -183,7 +188,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
-import request from "../utils/request";
+import request, { absoluteUrl } from "../utils/request";
 import { isLoggedIn } from "../utils/auth";
 
 const router = useRouter();

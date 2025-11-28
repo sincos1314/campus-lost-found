@@ -3,10 +3,20 @@ import { getToken, removeToken } from './auth'
 import { ElMessage } from 'element-plus'
 import router from '../router'
 
+const API_ORIGIN = import.meta.env.VITE_API_BASE || `http://${location.hostname}:5000`
 const request = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: `${API_ORIGIN}/api`,
   timeout: 10000
 })
+export const apiOrigin = API_ORIGIN
+export const absoluteUrl = (path) => {
+  if (!path) return ''
+  return path.startsWith('http') ? path : `${API_ORIGIN}${path}`
+}
+export const previewList = (path) => {
+  const u = absoluteUrl(path)
+  return u ? [u] : []
+}
 
 // 请求拦截器
 request.interceptors.request.use(

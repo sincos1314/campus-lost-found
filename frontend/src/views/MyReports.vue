@@ -51,10 +51,8 @@
           <template #default="{ row }">
             <el-image
               v-if="row.evidence_image_url"
-              :src="`http://localhost:5000${row.evidence_image_url}`"
-              :preview-src-list="[
-                `http://localhost:5000${row.evidence_image_url}`,
-              ]"
+              :src="absoluteUrl(row.evidence_image_url)"
+              :preview-src-list="previewList(row.evidence_image_url)"
               style="width: 60px; height: 60px"
             />
             <span v-else>无</span>
@@ -93,10 +91,8 @@
         <el-form-item label="当前证据">
           <el-image
             v-if="form.evidence_image_url"
-            :src="`http://localhost:5000${form.evidence_image_url}`"
-            :preview-src-list="[
-              `http://localhost:5000${form.evidence_image_url}`,
-            ]"
+            :src="absoluteUrl(form.evidence_image_url)"
+            :preview-src-list="[ absoluteUrl(form.evidence_image_url) ]"
             style="max-width: 100%"
           />
           <span v-else>暂无证据图片</span>
@@ -104,7 +100,7 @@
         <el-form-item label="更新证据">
           <el-upload
             ref="uploadRef"
-            :action="`http://localhost:5000/api/reports/${form.id}`"
+            :action="`${apiOrigin}/api/reports/${form.id}`"
             name="image"
             :headers="{ Authorization: `Bearer ${token}` }"
             :data="{
@@ -142,7 +138,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import request from "../utils/request";
+import request, { absoluteUrl, apiOrigin, previewList } from "../utils/request";
 import { useRouter } from "vue-router";
 import { getToken } from "../utils/auth";
 import { ElMessage } from "element-plus";

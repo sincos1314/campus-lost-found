@@ -166,8 +166,8 @@
         <el-form-item label="当前图片">
           <el-image
             v-if="editForm.image_url"
-            :src="`http://localhost:5000${editForm.image_url}`"
-            :preview-src-list="[ `http://localhost:5000${editForm.image_url}` ]"
+            :src="absoluteUrl(editForm.image_url)"
+            :preview-src-list="previewList(editForm.image_url)"
             fit="cover"
             style="max-width:100%; border-radius:8px"
           />
@@ -178,7 +178,7 @@
         </el-form-item>
         <el-form-item label="图片">
           <el-upload
-            :action="`http://localhost:5000/api/items/${editForm.id}/image`"
+            :action="`${apiOrigin}/api/items/${editForm.id}/image`"
             :headers="{ Authorization: `Bearer ${token}` }"
             name="image"
             :show-file-list="false"
@@ -236,6 +236,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
 import { getUser, getToken } from '../utils/auth'
+import { apiOrigin, absoluteUrl, previewList } from '../utils/request'
 
 const router = useRouter()
 const currentUser = getUser()

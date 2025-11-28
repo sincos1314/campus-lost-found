@@ -234,10 +234,8 @@
               <template #default="{ row }">
                 <el-image
                   v-if="row.evidence_image_url"
-                  :src="`http://localhost:5000${row.evidence_image_url}`"
-                  :preview-src-list="[
-                    `http://localhost:5000${row.evidence_image_url}`,
-                  ]"
+                  :src="absoluteUrl(row.evidence_image_url)"
+                  :preview-src-list="[ absoluteUrl(row.evidence_image_url) ]"
                   style="width: 60px; height: 60px"
                 />
                 <span v-else>无</span>
@@ -324,14 +322,10 @@
     <el-dialog v-model="userDialog" title="用户详情" width="600px">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="头像">
-          <el-avatar
-            :size="60"
-            :src="
-              currentUser?.avatar_url
-                ? `http://localhost:5000${currentUser.avatar_url}`
-                : ''
-            "
-          />
+              <el-avatar
+                :size="60"
+                :src="currentUser?.avatar_url ? absoluteUrl(currentUser.avatar_url) : ''"
+              />
         </el-descriptions-item>
         <el-descriptions-item label="用户名">{{
           currentUser?.username
@@ -403,7 +397,7 @@
         <el-descriptions-item label="图片">
           <img
             v-if="currentItem?.image_url"
-            :src="`http://localhost:5000${currentItem.image_url}`"
+            :src="absoluteUrl(currentItem.image_url)"
             style="max-width: 100%; border-radius: 8px"
           />
           <span v-else>无图片</span>
@@ -496,7 +490,7 @@
 
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
-import request from "../utils/request";
+import request, { absoluteUrl, previewList } from "../utils/request";
 import { getUser } from "../utils/auth";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";

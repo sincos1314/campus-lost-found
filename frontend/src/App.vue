@@ -2,7 +2,7 @@
   <div id="app">
     <el-container>
       <!-- 顶部导航栏 -->
-      <el-header class="app-header">
+      <el-header class="app-header animated-header">
         <div class="header-content">
           <!-- Logo和标题 -->
           <div class="logo-section" @click="goHome">
@@ -93,7 +93,7 @@
       </el-header>
 
       <!-- 主要内容区域 -->
-      <el-main class="app-main">
+      <el-main class="app-main gradient-bg">
         <router-view />
       </el-main>
     </el-container>
