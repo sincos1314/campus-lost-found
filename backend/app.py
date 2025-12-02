@@ -23,7 +23,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'lost_found.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-secret-key-change-in-production'  # 生产环境请修改
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024
@@ -1903,7 +1903,7 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ 数据库表创建成功！")
     
-    print("🚀 服务器启动在 http://0.0.0.0:5000 (局域网可访问)")
-    socketio.run(app, host='0.0.0.0', debug=True, port=5000, allow_unsafe_werkzeug=True)
+    print("🚀 服务器启动在 http://0.0.0.0:5000")
+    socketio.run(app, host='0.0.0.0', debug=False, port=5000)
 
 # 旧位置的同名路由删除，避免服务启动后再注册导致 404 预检命中默认处理

@@ -1,0 +1,16 @@
+[Unit]
+Description=Campus Lost Found Flask-SocketIO Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin/campus-lost-found/backend
+Environment=PYTHONUNBUFFERED=1
+Environment=JWT_SECRET_KEY=change_me_strong_secret
+ExecStart=/home/admin/campus-lost-found/backend/venv/bin/python app.py
+Restart=always
+User=admin
+Group=admin
+
+[Install]
+WantedBy=multi-user.target

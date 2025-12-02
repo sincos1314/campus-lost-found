@@ -1,80 +1,90 @@
-# 阿里云服务器部署指南
+# 部署到阿里云轻量应用服务器
 
-## 前提信息
+## 前提
 
-- 公网 IP: 8.163.2.139
+- 服务器公网 IP `8.163.2.139`
+- 目标目录 `/home/admin/campus-lost-found`
+- 放行安全组入站 `80`（HTTP），如需 HTTPS 另放行 `443`
 
-## 安全组与端口
+## 连接服务器
 
-- 在阿里云控制台为该实例安全组放行 `80` 与 `443` 入站
-- 若暂不启用 HTTPS，可先放行 `80`
+- Windows: 使用 PowerShell 或 PuTTY 通过 SSH 登录
+- SSH 示例: `ssh admin@8.163.2.139`
 
-## 服务器基础环境
+## 安装基础环境
 
-- SSH 登录 `ssh <用户名>@8.163.2.139`
-- 更新并安装依赖
-  - Ubuntu/Debian: `sudo apt update && sudo apt install -y git python3 python3-venv python3-pip nginx nodejs npm`
-  - CentOS/RHEL: `sudo yum install -y git python3 python3-venv python3-pip nginx nodejs npm`
+- Ubuntu/Debian: `sudo apt update && sudo apt install -y git python3 python3-venv python3-pip nginx nodejs npm`
+- CentOS/Rocky: 安装等价软件包
 
-## 拉取项目与目录
+## 拉取代码
 
-- `sudo mkdir -p /opt/lost-found-system`
-- 将项目代码复制或 `git clone` 到 `/opt/lost-found-system`
+- `sudo mkdir -p /home/admin/campus-lost-found`
+- `sudo chown -R admin:admin /home/admin`
+- `cd /home/admin`
+- `git clone <你的仓库地址> campus-lost-found`
 
-## 后端运行
+## 后端部署
 
-- 进入 `/opt/lost-found-system`
-- 执行 `bash deploy/run_backend.sh`
-- 该脚本会创建虚拟环境、安装依赖并启动后端监听 `0.0.0.0:5000`
-- 如需后台常驻，使用 systemd
-  - `sudo cp deploy/backend.service /etc/systemd/system/backend.service`
+- `cd /home/admin/campus-lost-found/backend`
+- `python3 -m venv venv`
+- `source venv/bin/activate`
+- `pip install -r requirements.txt`
+- `pip install eventlet`
+- 设置 JWT 密钥（systemd 将注入）
+- 创建并安装 systemd 服务:
+  - 将本仓库 `deploy/campus-lost-found-backend.service` 拷贝到 `/etc/systemd/system/campus-lost-found-backend.service`
+  - 修改其中 `Environment=JWT_SECRET_KEY=change_me_strong_secret` 为高强度随机值
   - `sudo systemctl daemon-reload`
-  - `sudo systemctl enable backend`
-  - `sudo systemctl start backend`
-  - 状态检查 `sudo systemctl status backend`
+  - `sudo systemctl enable campus-lost-found-backend`
+  - `sudo systemctl start campus-lost-found-backend`
+  - `sudo systemctl status campus-lost-found-backend` 确认运行正常
+- 手动运行调试（可选）:
+  - `export JWT_SECRET_KEY=<强密钥>`
+  - `python app.py`
 
 ## 前端构建
 
-- 在 `/opt/lost-found-system/frontend` 设置生产环境变量
-  - `.env.production` 已生成，默认：
-    - `VITE_API_BASE=http://8.163.2.139`
-    - `VITE_SOCKET_ORIGIN=http://8.163.2.139`
-- 构建前端
-  - `npm ci`
-  - `npm run build`
-  - 生成的 `dist` 目录位于 `frontend/dist`
+- `cd /home/admin/campus-lost-found/frontend`
+- `npm install`
+- 根据生产环境创建 `.env.production`（已提供模板）:
+  - `VITE_API_BASE=http://8.163.2.139`
+  - `VITE_SOCKET_ORIGIN=http://8.163.2.139`
+- `npm run build`
+- 构建产物位于 `frontend/dist`
 
-## Nginx 反向代理与静态托管
+## Nginx 配置
 
-- 将 `deploy/nginx.conf` 安装到 Nginx
-  - `sudo cp deploy/nginx.conf /etc/nginx/sites-available/lost-found`
-  - `sudo ln -s /etc/nginx/sites-available/lost-found /etc/nginx/sites-enabled/lost-found`
-  - 如为 CentOS，直接替换 `/etc/nginx/conf.d/lost-found.conf`
-- 测试并重载 Nginx
-  - `sudo nginx -t`
-  - `sudo systemctl restart nginx`
-- 访问 `http://8.163.2.139`
+- 将本仓库 `deploy/nginx.conf` 拷贝到 `/etc/nginx/conf.d/campus-lost-found.conf`
+- 如系统默认使用 `/etc/nginx/sites-available/default`，可替换为本配置内容
+- 检查配置: `sudo nginx -t`
+- 重新加载: `sudo systemctl reload nginx`
 
-## HTTPS（可选但推荐）
+## 防火墙与安全组
 
-- 安装 `certbot`，申请证书并配置到 Nginx 的 `443` 服务器块
-- 将前端 `.env.production` 中地址改为 `https://你的域名`
+- 阿里云控制台放行 `80`（HTTP）或 `443`（HTTPS）
+- 本机防火墙如启用 `ufw`:
+  - `sudo ufw allow 80/tcp`
+  - `sudo ufw allow 443/tcp`
 
-## 日志与排查
+## 访问验证
 
-- 后端日志：`journalctl -u backend -f`
-- Nginx 访问日志：`/var/log/nginx/access.log`
-- Nginx 错误日志：`/var/log/nginx/error.log`
+- 打开 `http://8.163.2.139`
+- 注册并登录，发布失物，上传图片，查看通知
+- 打开私信页面，确认 WebSocket 实时消息正常
 
-## 验证清单
+## 启用 HTTPS（可选）
 
-- 首页、登录、列表、详情均可访问
-- 图片与头像加载正常
-- 私信与图片发送正常，Socket 实时连接正常
-- 管理员页面各模块可正常访问与操作
-- 举报上传与证据预览正常
+- 准备域名并解析到服务器 IP
+- 安装证书工具（以 Ubuntu 为例）:
+  - `sudo apt install -y certbot python3-certbot-nginx`
+  - `sudo certbot --nginx -d <你的域名>`
+- 前端环境改为 `https`:
+  - `.env.production` 设置 `VITE_API_BASE=https://<你的域名>`
+  - `.env.production` 设置 `VITE_SOCKET_ORIGIN=https://<你的域名>`
+- 重新 `npm run build` 并 `reload nginx`
 
-## 维护与更新
+## 运维
 
-- 更新代码后端：`sudo systemctl restart backend`
-- 更新前端：在 `frontend` 重新构建并刷新 Nginx 静态内容
+- 查看后端日志: `sudo journalctl -u campus-lost-found-backend -f`
+- 重启后端: `sudo systemctl restart campus-lost-found-backend`
+- 备份数据库: `/home/admin/campus-lost-found/backend/lost_found.db`
