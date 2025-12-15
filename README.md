@@ -181,7 +181,7 @@
 
 ```bash
 # 使用 Git 克隆项目（如果有 Git 仓库）
-git clone <项目地址>
+git clone https://github.com/sincos1314/campus-lost-found.git
 
 # 或者直接下载 ZIP 文件并解压
 ```
@@ -605,15 +605,6 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key')
 ## 👥 贡献
 
 欢迎提交 Issue 和 Pull Request！
-
----
-
-## 📮 联系方式
-
-如有问题或建议，请通过以下方式联系：
-
-- 提交 Issue
-- 发送邮件
 
 ---
 

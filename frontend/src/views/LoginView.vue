@@ -124,11 +124,14 @@ const handleLogin = async () => {
       setToken(data.access_token)
       setUser(data.user)
       ElMessage.success('登录成功！')
-      if (data.user?.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/')
-      }
+      // 延迟一下让消息提示显示，然后跳转到首页并刷新页面以更新导航栏
+      setTimeout(() => {
+        // 统一跳转到首页
+        router.push('/').then(() => {
+          // 刷新页面以更新导航栏状态
+          window.location.reload()
+        })
+      }, 500)
     } catch (error) {
       const msg = error?.response?.data?.message || '登录失败，请重试'
       ElMessage.error(msg)

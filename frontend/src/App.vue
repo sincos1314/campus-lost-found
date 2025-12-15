@@ -208,10 +208,15 @@ const handleCommand = (command) => {
   if (command === 'profile') {
     router.push('/profile')
   } else if (command === 'logout') {
+    // 先清除 token 和用户信息
     removeToken()
     user.value = null
     ElMessage.success('已退出登录')
-    router.push('/login')
+    // 使用 window.location.replace 强制跳转并刷新页面，确保导航栏状态立即更新
+    // 添加时间戳参数确保 URL 变化，强制触发完整页面刷新
+    setTimeout(() => {
+      window.location.replace(`/login?t=${Date.now()}`)
+    }, 300)
   }
 }
 
