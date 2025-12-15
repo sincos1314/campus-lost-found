@@ -5,58 +5,82 @@
   box-sizing: border-box;
 }
 
+/* ============================================
+   新野兽派 (Neo-Brutalism) + 孟菲斯 (Memphis) 风格
+   ============================================ */
+
 :root {
-  --color-primary: #667eea;
-  --color-secondary: #764ba2;
-  --bg-page: #f5f7fa;
-  --bg-card: #ffffff;
-  --text-primary: #303133;
-  --text-secondary: #606266;
-  --muted: #909399;
-  --border: #e4e7ed;
-  --radius: 10px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  /* 配色方案 */
+  --color-primary: #FACC15;        /* 主背景色：亮黄色 */
+  --color-accent: #3B82F6;         /* 强调色：明亮蓝（用于按钮） */
+  --color-text: #000000;           /* 文字/边框色：纯黑 */
+  --color-card: #FFFFFF;           /* 卡片背景：纯白 */
+  
+  /* UI 特征 */
+  --border-width: 3px;             /* 边框宽度 */
+  --border-color: #000000;         /* 边框颜色 */
+  --border-radius: 12px;           /* 统一圆角 */
+  --shadow-offset: 4px;            /* 阴影偏移 */
+  --shadow-color: #000000;         /* 阴影颜色（硬阴影） */
+  
+  /* 辅助变量 */
+  --text-secondary: #333333;
+  --muted: #666666;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  background-color: var(--bg-page);
-  color: var(--text-primary);
+  color: var(--color-text);
   line-height: 1.6;
+  /* 波点背景纹理 - 孟菲斯风格 */
+  background-color: var(--color-primary);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.08) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
 }
 
+/* 新野兽派风格的背景（保留黄色背景，但可以添加装饰性元素） */
 .gradient-bg {
-  background-image: radial-gradient(
-      1000px 400px at 10% 0%,
-      rgba(102, 126, 234, 0.25),
-      transparent
-    ),
-    radial-gradient(
-      800px 300px at 90% 0%,
-      rgba(118, 75, 162, 0.25),
-      transparent
-    ),
-    linear-gradient(180deg, var(--bg-page), var(--bg-page));
+  background-color: var(--color-primary);
+  /* 可以添加一些装饰性的圆形元素 */
+  position: relative;
 }
 
+.gradient-bg::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(255, 100, 50, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(50, 200, 100, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 卡片样式 - 新野兽派风格 */
 .card-glass {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.65),
-    rgba(255, 255, 255, 0.45)
-  );
-  backdrop-filter: blur(10px);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  position: relative;
+  z-index: 1;
 }
 
+/* 悬停效果 - 硬阴影增强 */
 .hover-rise {
-  transition: transform 0.25s, box-shadow 0.25s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .hover-rise:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .image-zoom {
@@ -103,6 +127,7 @@ body {
   }
 }
 
+/* 头部装饰 - 新野兽派风格 */
 .animated-header {
   position: relative;
 }
@@ -111,41 +136,44 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  height: 6px;
-  background: linear-gradient(
-    90deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
-  filter: blur(3px);
-  opacity: 0.6;
+  bottom: -3px;
+  height: 3px;
+  background: var(--border-color);
+  /* 移除模糊，使用硬边 */
 }
 
+/* 按钮样式 - 新野兽派风格 */
 .btn-fancy {
-  background-image: linear-gradient(
-    90deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
+  background-color: var(--color-accent);
   color: #fff;
-  border: none;
-  box-shadow: var(--shadow);
-  transition: transform 0.2s ease, filter 0.2s ease;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .btn-fancy:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.05);
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+.btn-fancy:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+/* 暗色模式 - 保持新野兽派风格 */
+body.dark {
+  --color-primary: #1a1a1a;
+  --color-card: #2d2d2d;
+  --color-text: #ffffff;
+  --color-accent: #3B82F6;
+  --border-color: #ffffff;
+  --shadow-color: #ffffff;
+  --text-secondary: #cccccc;
+  --muted: #999999;
 }
 
 body.dark {
-  --bg-page: #121212;
-  --bg-card: #1e1e1e;
-  --text-primary: #e5eaf3;
-  --text-secondary: #cfd3dc;
-  --muted: #a3a6ad;
-  --border: #2e2e2e;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
 /* 通用样式 */
@@ -155,66 +183,385 @@ body.dark {
   padding: 0 2rem;
 }
 
-/* 按钮样式 */
+/* 按钮样式 - 新野兽派风格 */
 .btn {
   padding: 0.6rem 1.5rem;
-  border: none;
-  border-radius: 5px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   text-decoration: none;
   display: inline-block;
   text-align: center;
+  background-color: var(--color-card);
+  color: var(--color-text);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.btn:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.btn:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 
 .btn-primary {
-  background-color: var(--color-primary);
+  background-color: var(--color-accent);
   color: white;
+  border-color: var(--border-color);
 }
 
 .btn-primary:hover {
-  background-color: #5568d3;
-  transform: translateY(-2px);
+  background-color: var(--color-accent);
 }
 
 .btn-success {
   background-color: #48bb78;
   color: white;
+  border-color: var(--border-color);
 }
 
 .btn-success:hover {
-  background-color: #38a169;
+  background-color: #48bb78;
 }
 
 .btn-danger {
   background-color: #f56565;
   color: white;
+  border-color: var(--border-color);
 }
 
 .btn-danger:hover {
-  background-color: #e53e3e;
+  background-color: #f56565;
 }
 
-/* 卡片样式 */
+/* 卡片样式 - 新野兽派风格 */
 .card {
-  background: var(--bg-card);
-  border-radius: var(--radius);
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
   padding: 2rem;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
   margin-bottom: 1.5rem;
 }
 
-/* 输入框样式 */
+/* 输入框样式 - 新野兽派风格 */
 input,
 select,
 textarea {
   font-family: inherit;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.6rem 1rem;
+  background-color: var(--color-card);
+  color: var(--color-text);
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--color-primary);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  border-color: var(--border-color);
+}
+
+/* Element Plus 输入框全局样式 - 仿照 textarea 的方式，只在外层有样式 */
+/* 使用更高优先级的选择器确保覆盖所有 Element Plus 默认样式 */
+
+/* 第一步：移除所有最外层容器的边框和阴影 */
+.el-input,
+.el-select,
+.el-date-editor,
+.el-textarea,
+.el-input.is-disabled,
+.el-select.is-disabled,
+.el-textarea.is-disabled {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 第二步：input 和 select 的包装器是唯一有边框的外层（仿照 textarea__inner） */
+.el-input__wrapper,
+.el-input__wrapper.is-disabled,
+.el-input__wrapper:hover,
+.el-input__wrapper.is-focus {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.el-select__wrapper,
+.el-select__wrapper.is-disabled,
+.el-select__wrapper:hover,
+.el-select__wrapper.is-focused {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* textarea 特殊处理 - el-textarea 本身不应该有边框，只有 inner 有（这是正确的） */
+.el-textarea,
+.el-textarea.is-disabled {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* textarea 的 inner 是唯一的边框容器（这是正确的，保持不变） */
+.el-textarea__inner,
+.el-textarea__inner.is-disabled {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  color: var(--color-text) !important;
+  min-height: auto !important;
+}
+
+/* 第三步：移除所有内部元素的边框、背景、阴影等样式（完全透明，仿照 textarea 内部） */
+.el-input__inner,
+.el-input__inner.is-disabled,
+.el-input__inner:focus,
+.el-input__inner:hover,
+.el-select__placeholder,
+.el-select__selected-item,
+.el-select__selected-item.is-disabled,
+.el-select__caret,
+.el-select__suffix,
+.el-select__prefix {
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+/* 移除 input wrapper 内部所有可能的边框元素 */
+.el-input__prefix,
+.el-input__suffix,
+.el-input__prefix-inner,
+.el-input__suffix-inner {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 移除 select wrapper 内部所有可能的边框元素 */
+.el-select__caret,
+.el-select__arrow {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 第四步：焦点状态的硬阴影（只在外层） */
+.el-input__wrapper.is-focus {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-textarea__inner:focus {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 日期选择器 - 仿照 textarea 的样式，只在外层有边框 */
+/* 对于 daterange 类型，el-date-editor 本身是外层容器，应该有边框 */
+.el-date-editor.el-input--large,
+.el-date-editor.el-input--default,
+.el-date-editor.el-input--small {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* 对于单个日期选择器，wrapper 有边框 */
+.el-date-editor:not(.el-range-editor) .el-input__wrapper,
+.el-date-editor:not(.el-range-editor) .el-input__wrapper.is-focus,
+.el-date-editor:not(.el-range-editor) .el-input__wrapper:hover {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* 日期范围选择器（daterange）内部的所有输入框完全透明 - 加强规则 */
+.el-date-editor.el-range-editor .el-input,
+.el-date-editor.el-range-editor .el-input.is-focus,
+.el-date-editor.el-range-editor .el-input:hover,
+.el-date-editor.el-range-editor .el-input__wrapper,
+.el-date-editor.el-range-editor .el-input__wrapper.is-focus,
+.el-date-editor.el-range-editor .el-input__wrapper:hover,
+.el-date-editor.el-range-editor .el-input__wrapper.is-disabled,
+.el-date-editor.el-range-editor .el-input__wrapper.is-active {
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* 日期范围选择器内部的所有元素完全透明 - 覆盖所有可能的状态 */
+.el-date-editor.el-range-editor .el-input__inner,
+.el-date-editor.el-range-editor .el-input__inner:focus,
+.el-date-editor.el-range-editor .el-input__inner:hover,
+.el-date-editor.el-range-editor .el-input__inner.is-disabled,
+.el-date-editor.el-range-editor .el-input__prefix,
+.el-date-editor.el-range-editor .el-input__prefix-inner,
+.el-date-editor.el-range-editor .el-input__suffix,
+.el-date-editor.el-range-editor .el-input__suffix-inner,
+.el-date-editor.el-range-editor .el-range-separator,
+.el-date-editor.el-range-editor .el-range-input,
+.el-date-editor.el-range-editor .el-range-input__inner {
+  border: none !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+/* 单个日期选择器内部元素完全透明 */
+.el-date-editor:not(.el-range-editor) .el-input__inner,
+.el-date-editor:not(.el-range-editor) .el-input__inner:focus,
+.el-date-editor:not(.el-range-editor) .el-input__inner:hover,
+.el-date-editor:not(.el-range-editor) .el-input__prefix,
+.el-date-editor:not(.el-range-editor) .el-input__suffix,
+.el-date-editor:not(.el-range-editor) .el-input__prefix-inner,
+.el-date-editor:not(.el-range-editor) .el-input__suffix-inner {
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+/* 焦点状态的硬阴影（只在外层） */
+.el-date-editor.el-range-editor.is-focus,
+.el-date-editor.el-range-editor:focus-within {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-date-editor:not(.el-range-editor) .el-input__wrapper.is-focus {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 全局按钮文字颜色修复 */
+.el-button--primary {
+  color: white !important;
+}
+
+.el-button--primary:hover {
+  color: white !important;
+}
+
+.el-button--success {
+  color: white !important;
+}
+
+.el-button--success:hover {
+  color: white !important;
+}
+
+.el-button--danger {
+  color: white !important;
+}
+
+.el-button--danger:hover {
+  color: white !important;
+}
+
+.el-button--warning {
+  color: white !important;
+}
+
+.el-button--warning:hover {
+  color: white !important;
+}
+
+/* ============================================
+   全局辅助类 - 新野兽派风格
+   ============================================ */
+
+/* 硬边框卡片 */
+.brutal-card {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+/* 硬边框按钮 */
+.brutal-button {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 0.6rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-button:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.brutal-button:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+/* 强调色按钮 */
+.brutal-button-primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+/* 硬边框输入框 */
+.brutal-input {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0.6rem 1rem;
+  background-color: var(--color-card);
+  color: var(--color-text);
+  transition: box-shadow 0.15s ease;
+}
+
+.brutal-input:focus {
+  outline: none;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }

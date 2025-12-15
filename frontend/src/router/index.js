@@ -95,13 +95,8 @@ router.beforeEach((to, from, next) => {
       ElMessage.warning('请先登录')
       next('/login')
     } else {
-      const u = getUser()
-      if (u?.role !== 'admin') {
-        ElMessage.error('无权限访问后台')
-        next('/')
-      } else {
-        next()
-      }
+      // 允许普通用户访问数据看板，但只能看到统计信息
+      next()
     }
   } else if (isLoggedIn() && getUser()?.is_banned) {
     const blocked = ['/post']

@@ -130,57 +130,65 @@ const contactBanAdmin = async () => {
 <style scoped>
 .messages-container {
   max-width: 800px;
-  margin: 20px auto;
-  padding: 0 20px;
+  margin: 2rem auto;
+  padding: 0 2rem;
 }
 
 .messages-card {
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 1.5rem;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 1rem;
 }
 
 .title {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 1.5rem;
+  font-weight: 900;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--color-text);
 }
 
 .conversation-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0.5rem;
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  padding: 15px;
+  padding: 1rem;
   cursor: pointer;
-  transition: background-color 0.3s;
-  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.15s ease;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--color-card);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 
 .conversation-item:hover {
-  background-color: #f5f7fa;
-}
-
-.conversation-item:last-child {
-  border-bottom: none;
+  background: var(--color-primary);
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .avatar {
   flex-shrink: 0;
   margin-right: 15px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-accent);
   color: white;
-  font-weight: bold;
+  font-weight: 900;
+  border: var(--border-width) solid var(--border-color);
 }
 
 .conversation-info {
@@ -196,14 +204,14 @@ const contactBanAdmin = async () => {
 }
 
 .username {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 16px;
-  color: #303133;
+  color: var(--color-text);
 }
 
 .time {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-secondary);
 }
 
 .bottom-line {
@@ -215,10 +223,28 @@ const contactBanAdmin = async () => {
 .last-message {
   flex: 1;
   font-size: 14px;
-  color: #606266;
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.messages-card :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.messages-card :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white;
+}
+
+.messages-card :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .unread-count {

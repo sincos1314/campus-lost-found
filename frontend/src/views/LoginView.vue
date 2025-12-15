@@ -162,16 +162,22 @@ const submitReset = async () => {
 
 <style scoped>
 .login-container {
-  min-height: calc(100vh - 130px);
+  min-height: calc(100vh - 80px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
+  padding: 2rem;
 }
 
 .login-card {
-  width: 400px;
-  border-radius: 15px;
+  width: 100%;
+  max-width: 450px;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 2rem;
 }
 
 .card-header {
@@ -179,25 +185,80 @@ const submitReset = async () => {
   flex-direction: column;
   align-items: center;
   gap: 15px;
+  margin-bottom: 1.5rem;
 }
 
 .card-header h2 {
   margin: 0;
-  color: #333;
+  color: var(--color-text);
+  font-size: 1.8rem;
+  font-weight: 900;
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 - 确保没有嵌套边框 */
+.login-card :deep(.el-input) {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.login-card :deep(.el-input__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.login-card :deep(.el-input__inner) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.login-card :deep(.el-input__wrapper.is-focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
 }
 
 .login-btn {
   width: 100%;
-  height: 45px;
-  font-size: 16px;
+  height: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  background: var(--color-accent);
+  color: white;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.login-btn:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 
 .links {
   text-align: center;
-  color: #666;
+  color: var(--color-text);
+  font-weight: 600;
+  margin-top: 1rem;
 }
 
 .links span {
   margin-right: 10px;
+}
+
+.login-card :deep(.el-link) {
+  font-weight: 700;
+  color: var(--color-accent);
 }
 </style>

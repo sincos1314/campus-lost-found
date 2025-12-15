@@ -89,7 +89,7 @@
               <h3>时间线</h3>
               <el-timeline>
                 <el-timeline-item
-                  v-for="(ev, i) in timeline"
+                  v-for="(ev, i) in filteredTimeline"
                   :key="i"
                   :timestamp="ev.time"
                   :type="ev.type === 'success' ? 'success' : 'primary'"
@@ -205,6 +205,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import ReportDialog from "../components/ReportDialog.vue";
 import request from "../utils/request";
 import { isLoggedIn, getUser } from "../utils/auth";
+import { absoluteUrl, previewList } from '../utils/request'
 
 const route = useRoute();
 const router = useRouter();
@@ -216,8 +217,24 @@ const timeline = ref([]);
 const shareVisible = ref(false);
 const qrUrl = ref("");
 const reportVisible = ref(false);
-import { absoluteUrl, previewList } from '../utils/request'
 const fullImageUrl = computed(() => item.value?.image_url ? absoluteUrl(item.value.image_url) : '')
+
+// 过滤时间线：只显示"发布"和"物品已找回"，并修改"物品已找回"的描述
+const filteredTimeline = computed(() => {
+  return timeline.value.filter(ev => {
+    // 只保留"发布"和"物品已找回"相关的事件
+    return ev.title === '发布' || ev.title === '物品已找回'
+  }).map(ev => {
+    // 修改"物品已找回"的描述
+    if (ev.title === '物品已找回') {
+      return {
+        ...ev,
+        description: item.value.category === 'lost' ? '恭喜！失物已找回！' : '恭喜！拾物已被找回！'
+      }
+    }
+    return ev
+  })
+})
 
 // 获取当前用户ID
 const getCurrentUserId = () => {
@@ -346,23 +363,38 @@ const onReported = () => {
 <style scoped>
 .item-detail-container {
   max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 20px;
+  margin: 2rem auto;
+  padding: 0 2rem;
 }
 
 .back-button {
-  margin-bottom: 20px;
+  margin-bottom: 2rem;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.back-button:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .detail-card {
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 2rem;
 }
 
 .image-section {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--border-radius);
   overflow: hidden;
+  border: var(--border-width) solid var(--border-color);
 }
 
 .item-image {
@@ -377,8 +409,8 @@ const onReported = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-page);
-  color: #909399;
+  background-color: var(--color-primary);
+  color: var(--text-secondary);
 }
 
 .info-section {
@@ -390,9 +422,10 @@ const onReported = () => {
 }
 
 .title-section h2 {
-  font-size: 28px;
+  font-size: 2rem;
+  font-weight: 900;
   margin: 0 0 15px 0;
-  color: #303133;
+  color: var(--color-text);
 }
 
 .tags {
@@ -429,9 +462,10 @@ const onReported = () => {
 
 .description-section h3,
 .contact-section h3 {
-  font-size: 18px;
+  font-size: 1.3rem;
+  font-weight: 700;
   margin-bottom: 15px;
-  color: #303133;
+  color: var(--color-text);
 }
 
 .description-text {
@@ -439,9 +473,10 @@ const onReported = () => {
   line-height: 1.8;
   color: var(--text-secondary);
   white-space: pre-wrap;
-  background-color: var(--bg-page);
-  padding: 15px;
-  border-radius: 4px;
+  background-color: var(--color-primary);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  border: var(--border-width) solid var(--border-color);
 }
 
 .phone-number {
@@ -454,12 +489,28 @@ const onReported = () => {
   display: flex;
   gap: 15px;
   padding-top: 20px;
-  border-top: 1px solid #e4e7ed;
+  border-top: var(--border-width) solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .action-section .el-button {
   flex: 1;
   max-width: 200px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.action-section .el-button:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.action-section .el-button:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 
 /* 响应式 */
@@ -475,5 +526,31 @@ const onReported = () => {
   .action-section .el-button {
     max-width: 100%;
   }
+}
+
+/* 对话框中的输入框样式 */
+.item-detail-container :deep(.el-dialog) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.item-detail-container :deep(.el-dialog .el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.item-detail-container :deep(.el-dialog .el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.item-detail-container :deep(.el-dialog .el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 </style>

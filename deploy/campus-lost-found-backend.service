@@ -7,8 +7,9 @@ Type=simple
 WorkingDirectory=/home/admin/campus-lost-found/backend
 Environment=PYTHONUNBUFFERED=1
 Environment=JWT_SECRET_KEY=change_me_strong_secret
-ExecStart=/home/admin/campus-lost-found/backend/venv/bin/python app.py
+ExecStart=/home/admin/campus-lost-found/backend/venv/bin/python /home/admin/campus-lost-found/backend/app.py
 Restart=always
+RestartSec=5
 User=admin
 Group=admin
 

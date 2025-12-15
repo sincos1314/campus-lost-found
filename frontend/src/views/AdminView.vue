@@ -1,7 +1,7 @@
 <template>
   <div class="admin-container">
     <el-card shadow="never">
-      <div class="toolbar">
+      <div class="toolbar" v-if="isAdmin">
         <el-input
           v-model="keyword"
           placeholder="搜索用户名/标题"
@@ -39,8 +39,12 @@
           >创建物品</el-button
         >
       </div>
+      <div v-else class="user-stats-header">
+        <h2>数据统计</h2>
+        <p>查看平台基本统计数据</p>
+      </div>
       <el-tabs v-model="tab">
-        <el-tab-pane label="用户" name="users">
+        <el-tab-pane label="用户" name="users" v-if="isAdmin">
           <el-table :data="usersPaged" style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="username" label="用户名" />
@@ -127,7 +131,7 @@
             />
           </div>
         </el-tab-pane>
-        <el-tab-pane label="物品" name="items">
+        <el-tab-pane label="物品" name="items" v-if="isAdmin">
           <el-table :data="itemsPaged" style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="title" label="标题" />
@@ -186,7 +190,7 @@
             />
           </div>
         </el-tab-pane>
-        <el-tab-pane label="举报" name="reports">
+        <el-tab-pane label="举报" name="reports" v-if="isAdmin">
           <el-table :data="reportsPaged" style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column label="举报类别">
@@ -258,7 +262,7 @@
                   v-model="row.resolution_note"
                   placeholder="处理备注"
                   @change="updateReportStatus(row)"
-                  style="margin-top: 6px"
+                  style="margin-top: 6px; width: 100%"
                 />
                 <div
                   style="
@@ -311,7 +315,11 @@
         </el-tab-pane>
         <el-tab-pane label="统计" name="stats">
           <div class="stats">
-            <el-card class="stat-card" v-for="(v, k) in stats" :key="k">
+            <el-card 
+              class="stat-card" 
+              v-for="(v, k) in filteredStats" 
+              :key="k"
+            >
               <div class="stat-title">{{ statText(k) }}</div>
               <div class="stat-value">{{ v }}</div>
             </el-card>
@@ -512,6 +520,7 @@ const usersPage = ref(1);
 const itemsPage = ref(1);
 const reportsPage = ref(1);
 const me = getUser();
+const isAdmin = computed(() => me?.role === 'admin');
 const meLevel = me?.admin_level || "";
 const meId = me?.id || 0;
 const canAppointLow = computed(() => meLevel === "mid" || meLevel === "high");
@@ -553,17 +562,64 @@ const statText = (k) =>
     reports_open: "未处理举报",
   }[k] || k);
 
+// 普通用户只能看到部分统计信息
+const filteredStats = computed(() => {
+  if (isAdmin.value) {
+    return stats.value;
+  }
+  // 普通用户只能看到：用户总数、已解决数量、物品总数、失物数量、拾物数量
+  const allowedKeys = ['users', 'closed', 'items', 'lost', 'found'];
+  const filtered = {};
+  Object.keys(stats.value).forEach(key => {
+    if (allowedKeys.includes(key)) {
+      filtered[key] = stats.value[key];
+    }
+  });
+  return filtered;
+});
+
 const load = async () => {
-  if (tab.value === "users") users.value = await request.get("/admin/users");
-  if (tab.value === "items") items.value = await request.get("/admin/items");
-  if (tab.value === "reports")
-    reports.value = await request.get("/admin/reports", {
-      params: { status: reportStatus.value },
-    });
-  if (tab.value === "stats") stats.value = await request.get("/admin/stats");
+  try {
+    if (isAdmin.value) {
+      if (tab.value === "users") users.value = await request.get("/admin/users");
+      if (tab.value === "items") items.value = await request.get("/admin/items");
+      if (tab.value === "reports")
+        reports.value = await request.get("/admin/reports", {
+          params: { status: reportStatus.value },
+        });
+    }
+    if (tab.value === "stats") {
+      try {
+        stats.value = await request.get("/admin/stats");
+      } catch (error) {
+        if (error.response?.status === 403) {
+          ElMessage.error('您没有权限访问数据看板，仅管理员可访问');
+          // 如果不是管理员，重定向到首页
+          if (!isAdmin.value) {
+            setTimeout(() => {
+              router.push('/');
+            }, 1500);
+          }
+        } else {
+          throw error;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('加载数据失败:', error);
+    if (error.response?.status !== 403) {
+      ElMessage.error('加载数据失败');
+    }
+  }
 };
 
-onMounted(load);
+onMounted(() => {
+  // 普通用户默认显示统计页面
+  if (!isAdmin.value) {
+    tab.value = "stats";
+  }
+  load();
+});
 watch(tab, load);
 
 const banUser = async (row) => {
@@ -753,9 +809,18 @@ const viewItem = (row) => {
 <style scoped>
 .admin-container {
   max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 20px;
+  margin: 2rem auto;
+  padding: 0 2rem;
 }
+
+.admin-container :deep(.el-card) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 1.5rem;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -765,17 +830,164 @@ const viewItem = (row) => {
   text-align: center;
 }
 .stat-title {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-text);
 }
 .stat-value {
   font-size: 24px;
+  font-weight: 900;
+  color: var(--color-text);
 }
-</style>
-<style scoped>
+
 .pagination {
   display: flex;
   justify-content: center;
   padding: 12px 0;
 }
+
+.toolbar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.user-stats-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.user-stats-header h2 {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+
+.user-stats-header p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.admin-container :deep(.el-input),
+.admin-container :deep(.el-select) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.admin-container :deep(.el-input__wrapper),
+.admin-container :deep(.el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.admin-container :deep(.el-input__inner),
+.admin-container :deep(.el-select__placeholder),
+.admin-container :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.admin-container :deep(.el-input__wrapper.is-focus),
+.admin-container :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.admin-container :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-container :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.admin-container :deep(.el-button--success) {
+  background: #48bb78;
+  color: white !important;
+}
+
+.admin-container :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.admin-container :deep(.el-table) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.admin-container :deep(.el-table th) {
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 900;
+}
+
+/* 对话框中的输入框样式 */
+.admin-container :deep(.el-dialog) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.admin-container :deep(.el-dialog .el-input),
+.admin-container :deep(.el-dialog .el-select),
+.admin-container :deep(.el-dialog .el-date-editor),
+.admin-container :deep(.el-dialog .el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.admin-container :deep(.el-dialog .el-input__wrapper),
+.admin-container :deep(.el-dialog .el-select__wrapper),
+.admin-container :deep(.el-dialog .el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.admin-container :deep(.el-dialog .el-input__inner),
+.admin-container :deep(.el-dialog .el-textarea__inner),
+.admin-container :deep(.el-dialog .el-select__placeholder),
+.admin-container :deep(.el-dialog .el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.admin-container :deep(.el-dialog .el-input__wrapper.is-focus),
+.admin-container :deep(.el-dialog .el-textarea__inner:focus),
+.admin-container :deep(.el-dialog .el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.admin-container :deep(.el-dialog .el-date-editor .el-input__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+}
+
+.admin-container :deep(.el-dialog .el-date-editor .el-input__wrapper.is-focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+}
 </style>
-const router = useRouter()

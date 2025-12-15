@@ -139,8 +139,8 @@
         <el-form-item label="标题" prop="title">
           <el-input v-model="editForm.title" />
         </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input v-model="editForm.description" type="textarea" />
+        <el-form-item label="详细描述" prop="description">
+          <el-input v-model="editForm.description" type="textarea" :rows="5" />
         </el-form-item>
         <el-form-item label="类型" prop="category">
           <el-select v-model="editForm.category">
@@ -452,15 +452,197 @@ onMounted(() => {
 .my-items-container {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 2rem;
 }
 
 .stats-card,
-.filter-card {
-  margin-bottom: 20px;
-  border-radius: 10px;
+.filter-card,
+.privacy-card {
+  margin-bottom: 2rem;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 1.5rem;
 }
 
-.privacy-card { margin-bottom: 20px; }
 .privacy-others { display:flex; align-items:center; gap:8px; }
 .bulk { display:flex; gap:8px; margin:8px 0; }
+
+.my-items-container :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.my-items-container :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.my-items-container :deep(.el-button--primary:hover) {
+  background: var(--color-accent) !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.my-items-container :deep(.el-button--success) {
+  background: #48bb78;
+  color: white !important;
+}
+
+.my-items-container :deep(.el-button--success:hover) {
+  background: #48bb78 !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.my-items-container :deep(.el-button--danger) {
+  background: #f56565;
+  color: white !important;
+}
+
+.my-items-container :deep(.el-button--danger:hover) {
+  background: #f56565 !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.my-items-container :deep(.el-button.is-link) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--color-accent) !important;
+  font-weight: 700;
+}
+
+.my-items-container :deep(.el-button.is-link:hover) {
+  background: transparent !important;
+  color: var(--color-accent) !important;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.my-items-container :deep(.el-input),
+.my-items-container :deep(.el-select),
+.my-items-container :deep(.el-date-editor) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.my-items-container :deep(.el-input__wrapper),
+.my-items-container :deep(.el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.my-items-container :deep(.el-input__inner),
+.my-items-container :deep(.el-select__placeholder),
+.my-items-container :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.my-items-container :deep(.el-input__wrapper.is-focus),
+.my-items-container :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.my-items-container :deep(.el-table) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.my-items-container :deep(.el-table th) {
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
+.my-items-container :deep(.el-table td) {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* 对话框中的输入框样式 */
+.my-items-container :deep(.el-dialog) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.my-items-container :deep(.el-dialog .el-input),
+.my-items-container :deep(.el-dialog .el-select),
+.my-items-container :deep(.el-dialog .el-date-editor),
+.my-items-container :deep(.el-dialog .el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.my-items-container :deep(.el-dialog .el-input__wrapper),
+.my-items-container :deep(.el-dialog .el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* textarea 特殊处理 - el-input type="textarea" 会渲染为 el-textarea */
+.my-items-container :deep(.el-dialog .el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.my-items-container :deep(.el-dialog .el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.my-items-container :deep(.el-dialog .el-input__inner),
+.my-items-container :deep(.el-dialog .el-textarea__inner),
+.my-items-container :deep(.el-dialog .el-select__placeholder),
+.my-items-container :deep(.el-dialog .el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.my-items-container :deep(.el-dialog .el-input__wrapper.is-focus),
+.my-items-container :deep(.el-dialog .el-textarea__inner:focus),
+.my-items-container :deep(.el-dialog .el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.my-items-container :deep(.el-dialog .el-date-editor .el-input__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+}
+
+.my-items-container :deep(.el-dialog .el-date-editor .el-input__wrapper.is-focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+}
 </style>

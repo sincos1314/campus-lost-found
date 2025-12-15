@@ -102,19 +102,47 @@
         </el-form-item>
 
         <el-form-item label="上传图片">
-          <el-upload
-            class="image-uploader"
-            :auto-upload="false"
-            :show-file-list="false"
-            :on-change="handleImageChange"
-            accept="image/*"
-          >
-            <img v-if="imagePreview" :src="imagePreview" class="preview-image" />
-            <el-icon v-else class="uploader-icon"><Plus /></el-icon>
-          </el-upload>
+          <div class="image-upload-container">
+            <div class="image-list" v-if="imageList.length > 0">
+              <div
+                v-for="(img, index) in imageList"
+                :key="index"
+                class="image-item"
+                :draggable="true"
+                @dragstart="handleDragStart(index, $event)"
+                @dragover.prevent
+                @drop="handleDrop(index, $event)"
+                @dragenter.prevent
+              >
+                <img :src="img.preview" class="thumbnail-image" />
+                <div class="image-overlay">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    circle
+                    :icon="Delete"
+                    @click="removeImage(index)"
+                    class="delete-btn"
+                  />
+                </div>
+                <div class="image-index">{{ index + 1 }}</div>
+              </div>
+            </div>
+            <el-upload
+              v-if="imageList.length < 8"
+              class="image-uploader"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="handleImageChange"
+              :multiple="true"
+              accept="image/*"
+            >
+              <el-icon class="uploader-icon"><Plus /></el-icon>
+            </el-upload>
+          </div>
           <div class="upload-tip">
             <el-text type="info" size="small">
-              支持 jpg、png、gif 格式，大小不超过5MB
+              支持 jpg、png、gif 格式，每张大小不超过10MB，最多上传8张，第一张将作为主图
             </el-text>
           </div>
         </el-form-item>
@@ -135,14 +163,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import request from '../utils/request'
 
 const router = useRouter()
 const route = useRoute()
 const formRef = ref()
 const loading = ref(false)
-const imageFile = ref(null)
-const imagePreview = ref('')
+const imageList = ref([])
+const draggedIndex = ref(null)
 
 const form = reactive({
   category: 'lost',
@@ -169,25 +198,58 @@ const rules = {
   ]
 }
 
-const handleImageChange = (file) => {
+const handleImageChange = (file, fileList) => {
+  // 检查是否已达到8张限制
+  if (imageList.value.length >= 8) {
+    ElMessage.warning('最多只能上传8张图片，请先删除部分图片后再上传')
+    return false
+  }
+
   const isImage = file.raw.type.startsWith('image/')
-  const isLt5M = file.raw.size / 1024 / 1024 < 5
+  const isLt10M = file.raw.size / 1024 / 1024 < 10
 
   if (!isImage) {
     ElMessage.error('只能上传图片文件！')
-    return
+    return false
   }
-  if (!isLt5M) {
-    ElMessage.error('图片大小不能超过5MB！')
-    return
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过10MB！')
+    return false
   }
 
-  imageFile.value = file.raw
   const reader = new FileReader()
   reader.onload = (e) => {
-    imagePreview.value = e.target.result
+    // 再次检查，防止在异步处理过程中超过限制
+    if (imageList.value.length >= 8) {
+      ElMessage.warning('最多只能上传8张图片')
+      return
+    }
+    imageList.value.push({
+      file: file.raw,
+      preview: e.target.result
+    })
   }
   reader.readAsDataURL(file.raw)
+  return true
+}
+
+const removeImage = (index) => {
+  imageList.value.splice(index, 1)
+}
+
+const handleDragStart = (index, event) => {
+  draggedIndex.value = index
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+const handleDrop = (index, event) => {
+  event.preventDefault()
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  
+  const draggedItem = imageList.value[draggedIndex.value]
+  imageList.value.splice(draggedIndex.value, 1)
+  imageList.value.splice(index, 0, draggedItem)
+  draggedIndex.value = null
 }
 
 const handleSubmit = async () => {
@@ -202,9 +264,15 @@ const handleSubmit = async () => {
       Object.keys(form).forEach(key => {
         formData.append(key, form[key])
       })
-      if (imageFile.value) {
-        formData.append('image', imageFile.value)
-      }
+      
+      // 按顺序上传图片，第一张作为主图
+      imageList.value.forEach((img, index) => {
+        if (index === 0) {
+          formData.append('image', img.file) // 主图
+        } else {
+          formData.append('images', img.file) // 副图
+        }
+      })
 
       await request.post('/items', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -222,8 +290,7 @@ const handleSubmit = async () => {
 
 const handleReset = () => {
   formRef.value?.resetFields()
-  imageFile.value = null
-  imagePreview.value = ''
+  imageList.value = []
 }
 
 onMounted(() => {
@@ -237,55 +304,283 @@ onMounted(() => {
 <style scoped>
 .post-container {
   max-width: 800px;
-  margin: 0 auto;
+  margin: 2rem auto;
+  padding: 0 2rem;
 }
 
 .post-card {
-  border-radius: 10px;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 2rem;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 1rem;
 }
 
 .card-header h2 {
   margin: 0;
-  color: #333;
+  color: var(--color-text);
+  font-size: 1.8rem;
+  font-weight: 900;
 }
 
-.image-uploader {
-  width: 180px;
-  height: 180px;
-  border: 2px dashed #d9d9d9;
-  border-radius: 8px;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 0.3s;
-}
-
-.image-uploader:hover {
-  border-color: #667eea;
-}
-
-.uploader-icon {
-  font-size: 40px;
-  color: #8c939d;
-  width: 180px;
-  height: 180px;
+.image-upload-container {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
-.preview-image {
+.image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.image-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  cursor: move;
+  transition: all 0.15s ease;
+  background: var(--color-card);
+}
+
+.image-item:hover {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.image-item.dragging {
+  opacity: 0.5;
+}
+
+.thumbnail-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.delete-btn {
+  background: rgba(245, 101, 101, 0.9);
+  border: none;
+}
+
+.image-index {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--color-accent);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--color-card);
+}
+
+.image-uploader {
+  width: 120px;
+  height: 120px;
+  border: var(--border-width) dashed var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.15s ease;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-uploader:hover {
+  border-color: var(--border-color);
+  border-style: solid;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.uploader-icon {
+  font-size: 40px;
+  color: #8c939d;
+}
+
 .upload-tip {
   margin-top: 10px;
+}
+
+.post-card :deep(.el-form-item__label) {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 - 仿照 textarea 的方式 */
+.post-card :deep(.el-input),
+.post-card :deep(.el-select),
+.post-card :deep(.el-date-editor),
+.post-card :deep(.el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 输入框和选择框的包装器是唯一有边框的外层（仿照 textarea__inner） */
+.post-card :deep(.el-input__wrapper),
+.post-card :deep(.el-input__wrapper.is-focus),
+.post-card :deep(.el-input__wrapper:hover),
+.post-card :deep(.el-select__wrapper),
+.post-card :deep(.el-select__wrapper.is-focused),
+.post-card :deep(.el-select__wrapper:hover) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* textarea 特殊处理 - el-textarea 本身不应该有边框（这是正确的） */
+.post-card :deep(.el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* textarea 的 inner 是唯一的边框容器（这是正确的，保持不变） */
+.post-card :deep(.el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  color: var(--color-text) !important;
+  min-height: auto !important;
+}
+
+/* 内部元素完全透明，没有任何边框、背景、阴影（仿照 textarea 内部） */
+.post-card :deep(.el-input__inner),
+.post-card :deep(.el-input__inner:focus),
+.post-card :deep(.el-input__inner:hover),
+.post-card :deep(.el-select__placeholder),
+.post-card :deep(.el-select__selected-item),
+.post-card :deep(.el-select__caret),
+.post-card :deep(.el-select__suffix),
+.post-card :deep(.el-select__prefix),
+.post-card :deep(.el-input__prefix),
+.post-card :deep(.el-input__suffix),
+.post-card :deep(.el-input__prefix-inner),
+.post-card :deep(.el-input__suffix-inner) {
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+/* 焦点状态的硬阴影（只在外层） */
+.post-card :deep(.el-input__wrapper.is-focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.post-card :deep(.el-textarea__inner:focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.post-card :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 日期选择器 */
+.post-card :deep(.el-date-editor.el-input) {
+  width: 100% !important;
+}
+
+.post-card :deep(.el-date-editor .el-input__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+}
+
+.post-card :deep(.el-date-editor .el-input__wrapper.is-focus) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+}
+
+/* 移除输入框前缀图标的默认样式 */
+.post-card :deep(.el-input__prefix) {
+  color: var(--color-text) !important;
+}
+
+/* 单选按钮组 */
+.post-card :deep(.el-radio-group) {
+  display: flex;
+  gap: 1rem;
+}
+
+.post-card :deep(.el-radio) {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.post-card :deep(.el-radio__input.is-checked .el-radio__inner) {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.post-card :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.post-card :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white;
+}
+
+.post-card :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.post-card :deep(.el-button:active) {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 </style>

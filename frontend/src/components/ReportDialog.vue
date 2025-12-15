@@ -130,3 +130,66 @@ const beforeEvidenceUpload = (file) => {
   return true;
 };
 </script>
+
+<style scoped>
+/* 对话框中的输入框样式 */
+:deep(.el-dialog) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+:deep(.el-dialog .el-input),
+:deep(.el-dialog .el-select),
+:deep(.el-dialog .el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:deep(.el-dialog .el-input__wrapper),
+:deep(.el-dialog .el-select__wrapper),
+:deep(.el-dialog .el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+:deep(.el-dialog .el-input__inner),
+:deep(.el-dialog .el-textarea__inner),
+:deep(.el-dialog .el-select__placeholder),
+:deep(.el-dialog .el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+:deep(.el-dialog .el-input__wrapper.is-focus),
+:deep(.el-dialog .el-textarea__inner:focus),
+:deep(.el-dialog .el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+:deep(.el-dialog .el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+:deep(.el-dialog .el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+:deep(.el-dialog .el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+</style>

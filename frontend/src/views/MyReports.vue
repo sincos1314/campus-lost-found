@@ -19,7 +19,12 @@
         </div>
       </template>
       <el-empty v-if="reports.length === 0" description="暂无举报" />
-      <el-table v-else :data="filtered" style="width: 100%">
+      <el-table 
+        v-else 
+        :data="filtered" 
+        :row-class-name="getRowClassName"
+        style="width: 100%"
+      >
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column label="举报类别" width="120">
           <template #default="{ row }">{{
@@ -32,7 +37,11 @@
           }}</template>
         </el-table-column>
         <el-table-column label="状态" width="120">
-          <template #default="{ row }">{{ statusText(row.status) }}</template>
+          <template #default="{ row }">
+            <span :class="{ 'withdrawn-text': row.status === 'withdrawn' }">
+              {{ statusText(row.status) }}
+            </span>
+          </template>
         </el-table-column>
         <el-table-column prop="description" label="说明" />
         <el-table-column label="被举报物品" width="220">
@@ -233,18 +242,193 @@ const withdrawReport = async (row) => {
   await request.put(`/reports/${row.id}`, { withdraw: true });
   await load();
 };
+
+// 为表格行添加类名，用于样式控制
+const getRowClassName = ({ row }) => {
+  return row.status === 'withdrawn' ? 'withdrawn-row' : '';
+};
+
 onMounted(load);
 </script>
 
 <style scoped>
 .my-reports-container {
   max-width: 1000px;
-  margin: 20px auto;
-  padding: 0 20px;
+  margin: 2rem auto;
+  padding: 0 2rem;
 }
+
+.my-reports-container :deep(.el-card) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.my-reports-container :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.my-reports-container :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.my-reports-container :deep(.el-button--primary:hover) {
+  background: var(--color-accent) !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.my-reports-container :deep(.el-button--warning) {
+  background: #ed8936;
+  color: white !important;
+}
+
+.my-reports-container :deep(.el-button--warning:hover) {
+  background: #ed8936 !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.my-reports-container :deep(.el-button--danger) {
+  background: #f56565;
+  color: white !important;
+}
+
+.my-reports-container :deep(.el-button--danger:hover) {
+  background: #f56565 !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.my-reports-container :deep(.el-input),
+.my-reports-container :deep(.el-select),
+.my-reports-container :deep(.el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.my-reports-container :deep(.el-input__wrapper),
+.my-reports-container :deep(.el-select__wrapper),
+.my-reports-container :deep(.el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.my-reports-container :deep(.el-input__inner),
+.my-reports-container :deep(.el-textarea__inner),
+.my-reports-container :deep(.el-select__placeholder),
+.my-reports-container :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.my-reports-container :deep(.el-input__wrapper.is-focus),
+.my-reports-container :deep(.el-textarea__inner:focus),
+.my-reports-container :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.my-reports-container :deep(.el-table) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.my-reports-container :deep(.el-table th) {
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
+.my-reports-container :deep(.el-table td) {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* 已撤回举报的行样式 */
+.my-reports-container :deep(.el-table .withdrawn-row) {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  opacity: 0.65;
+  position: relative;
+}
+
+.my-reports-container :deep(.el-table .withdrawn-row:hover) {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.my-reports-container :deep(.el-table .withdrawn-row td) {
+  color: var(--muted) !important;
+}
+
+/* 已撤回举报文字样式 */
+.withdrawn-text {
+  color: #f56565 !important;
+  font-weight: 900 !important;
+}
+
+/* 对话框中的输入框样式 */
+.my-reports-container :deep(.el-dialog) {
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.my-reports-container :deep(.el-dialog .el-input),
+.my-reports-container :deep(.el-dialog .el-select),
+.my-reports-container :deep(.el-dialog .el-textarea) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.my-reports-container :deep(.el-dialog .el-input__wrapper),
+.my-reports-container :deep(.el-dialog .el-select__wrapper),
+.my-reports-container :deep(.el-dialog .el-textarea__inner) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.my-reports-container :deep(.el-dialog .el-input__inner),
+.my-reports-container :deep(.el-dialog .el-textarea__inner),
+.my-reports-container :deep(.el-dialog .el-select__placeholder),
+.my-reports-container :deep(.el-dialog .el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.my-reports-container :deep(.el-dialog .el-input__wrapper.is-focus),
+.my-reports-container :deep(.el-dialog .el-textarea__inner:focus),
+.my-reports-container :deep(.el-dialog .el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
 }
 </style>

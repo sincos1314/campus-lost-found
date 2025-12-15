@@ -106,15 +106,108 @@ loadItems()
 </script>
 
 <style scoped>
-.list-container { max-width: 1400px; margin: 0 auto; }
-.filter-card { margin-bottom: 20px; border-radius: 10px; }
+.list-container { 
+  max-width: 1400px; 
+  margin: 0 auto; 
+  padding: 2rem;
+}
+
+.filter-card { 
+  margin-bottom: 2rem; 
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 1.5rem;
+}
+
 .action-buttons { display: flex; gap: 10px; }
 .list-header { margin-bottom: 20px; }
-.item-card { margin-bottom: 20px; border-radius: 10px; overflow: hidden; cursor: pointer; }
-.item-image { width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; background: var(--bg-page); }
+.list-header h2 {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--color-text);
+}
+
+.item-card { 
+  margin-bottom: 20px; 
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  overflow: hidden; 
+  cursor: pointer; 
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.item-card:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.item-image { 
+  width: 100%; 
+  height: 180px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  background: var(--color-primary);
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
 .item-image img { width: 100%; height: 100%; object-fit: cover; }
-.item-title { font-size: 16px; font-weight: 600; margin: 10px 0; color: var(--text-primary); }
-.item-meta { display: flex; gap: 8px; }
-.no-image { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #909399; }
+.item-title { font-size: 16px; font-weight: 700; margin: 10px 0; color: var(--color-text); padding: 0 1rem; }
+.item-meta { display: flex; gap: 8px; padding: 0 1rem 1rem; }
+.no-image { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-secondary); }
 .pagination-bar { display: flex; justify-content: center; padding: 20px 0; }
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.filter-card :deep(.el-input),
+.filter-card :deep(.el-select) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.filter-card :deep(.el-input__wrapper),
+.filter-card :deep(.el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.filter-card :deep(.el-input__inner),
+.filter-card :deep(.el-select__placeholder),
+.filter-card :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.filter-card :deep(.el-input__wrapper.is-focus),
+.filter-card :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.filter-card :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-card :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.filter-card :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
 </style>

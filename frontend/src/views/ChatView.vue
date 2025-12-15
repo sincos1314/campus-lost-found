@@ -10,6 +10,7 @@
           </el-button>
           <span class="chat-title">
             {{ otherUser?.username }}
+            <span v-if="otherUser?.is_banned" class="banned-label">（此用户已被管理员封禁）</span>
             <el-tag v-if="otherUser?.role==='admin'" type="success" size="small" style="margin-left:8px">{{ levelText(otherUser?.admin_level) }}</el-tag>
           </span>
           <el-button size="small" @click="loadMessages">
@@ -455,6 +456,16 @@ onBeforeUnmount(() => {
   font-weight: bold;
   flex: 1;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.banned-label {
+  color: #f56565;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .message-list {

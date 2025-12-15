@@ -11,7 +11,6 @@
           <h2>{{ user?.username }}</h2>
           <p class="join-date">加入于 {{ user?.created_at }}</p>
           <p class="join-date">当前年级：{{ user?.grade_display || user?.grade || '未设置' }}</p>
-          <el-button v-if="user?.role==='admin'" type="primary" @click="goAdmin">进入管理员界面</el-button>
           <el-upload
             class="avatar-uploader"
             :action="'http://localhost:5000/api/auth/avatar'"
@@ -22,7 +21,9 @@
             :on-success="handleAvatarSuccess"
             :on-error="handleAvatarError"
           >
-            <el-button type="primary">{{ user?.avatar_url ? '修改头像' : '上传头像' }}</el-button>
+            <button class="avatar-upload-btn">
+              {{ user?.avatar_url ? '修改头像' : '上传头像' }}
+            </button>
           </el-upload>
         </el-card>
       </el-col>
@@ -119,7 +120,6 @@
                 保存修改
               </el-button>
               <el-button type="primary" plain @click="savePrivacy">保存隐私设置</el-button>
-              <el-button @click="handleReset">重置</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -248,14 +248,6 @@ const handleUpdate = async () => {
   })
 }
 
-const handleReset = () => {
-  form.email = user.value.email
-  form.phone = user.value.phone
-  form.password = ''
-  form.confirmPassword = ''
-  formRef.value?.clearValidate()
-}
-
 const openPrivacyRules = async () => {
   conversations.value = await request.get('/conversations')
   const userIdSetShow = privacy.rules.filter(r=>r.rule==='show').map(r=>r.target_user_id)
@@ -313,16 +305,20 @@ onMounted(() => {
 .profile-container {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 2rem;
 }
 
 .user-card,
 .profile-card {
-  border-radius: 10px;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 2rem;
 }
 
 .user-card {
   text-align: center;
-  padding: 30px 20px;
 }
 
 .user-avatar {
@@ -331,15 +327,98 @@ onMounted(() => {
 
 .user-card h2 {
   margin: 10px 0;
-  color: #333;
+  color: var(--color-text);
+  font-weight: 900;
+  font-size: 1.5rem;
 }
 
 .join-date {
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 14px;
+  font-weight: 600;
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.profile-card :deep(.el-input),
+.profile-card :deep(.el-select) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.profile-card :deep(.el-input__wrapper),
+.profile-card :deep(.el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.profile-card :deep(.el-input__inner),
+.profile-card :deep(.el-select__placeholder),
+.profile-card :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.profile-card :deep(.el-input__wrapper.is-focus),
+.profile-card :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.profile-card :deep(.el-form-item__label) {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.profile-card :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.profile-card :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white !important;
+}
+
+.profile-card :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+/* 修改头像按钮样式 */
+.avatar-upload-btn {
+  padding: 0.6rem 1.5rem;
+  background: var(--color-accent);
+  color: white;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+}
+
+.avatar-upload-btn:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.avatar-upload-btn:active {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.avatar-uploader {
+  margin-top: 1rem;
 }
 </style>
-const goAdmin = () => {
-  // 仅管理员显示按钮，点击进入后台
-  router.push('/admin')
-}

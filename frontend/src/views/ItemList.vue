@@ -307,11 +307,128 @@ const onDateChange = () => {
 .list-container {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 2rem;
 }
 
 .filter-card {
-  margin-bottom: 20px;
-  border-radius: 10px;
+  margin-bottom: 2rem;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  padding: 1.5rem;
+}
+
+/* 移除 Element Plus 默认的输入框包装器样式 */
+.filter-card :deep(.el-input),
+.filter-card :deep(.el-select),
+.filter-card :deep(.el-date-editor) {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.filter-card :deep(.el-input__wrapper),
+.filter-card :deep(.el-select__wrapper) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.filter-card :deep(.el-input__inner),
+.filter-card :deep(.el-select__placeholder),
+.filter-card :deep(.el-select__selected-item) {
+  border: none !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.filter-card :deep(.el-input__wrapper.is-focus),
+.filter-card :deep(.el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 日期范围选择器 - 仿照 textarea 的样式，只在外层有边框 */
+/* el-date-editor.el-range-editor 本身是外层容器，应该有边框（仿照 textarea__inner） */
+.filter-card :deep(.el-date-editor.el-range-editor) {
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* 日期范围选择器内部的输入框完全透明，没有任何边框、背景、阴影 - 加强规则 */
+.filter-card :deep(.el-date-editor.el-range-editor .el-input),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input.is-focus),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input:hover),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__wrapper),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__wrapper.is-focus),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__wrapper:hover),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__wrapper.is-disabled),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__wrapper.is-active) {
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0.6rem 1rem !important;
+}
+
+/* 日期范围选择器内部的所有元素完全透明 - 覆盖所有可能的状态 */
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__inner),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__inner:focus),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__inner:hover),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__inner.is-disabled),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__prefix),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__prefix-inner),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__suffix),
+.filter-card :deep(.el-date-editor.el-range-editor .el-input__suffix-inner),
+.filter-card :deep(.el-date-editor.el-range-editor .el-range-separator),
+.filter-card :deep(.el-date-editor.el-range-editor .el-range-input),
+.filter-card :deep(.el-date-editor.el-range-editor .el-range-input__inner) {
+  border: none !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+/* 焦点状态的硬阴影（只在外层） */
+.filter-card :deep(.el-date-editor.el-range-editor.is-focus),
+.filter-card :deep(.el-date-editor.el-range-editor:focus-within) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.filter-card :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-card :deep(.el-button--primary) {
+  background: var(--color-accent);
+  color: white;
+}
+
+.filter-card :deep(.el-button:hover) {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.filter-card :deep(.el-button:active) {
+  transform: translateY(0) translateX(0);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
 
 .action-buttons {
@@ -320,40 +437,45 @@ const onDateChange = () => {
 }
 
 .list-header {
-  margin-bottom: 20px;
+  margin-bottom: 2rem;
 }
 
 .list-header h2 {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--text-primary);
-  font-size: 24px;
+  color: var(--color-text);
+  font-size: 2rem;
+  font-weight: 900;
 }
 
 .item-card {
   margin-bottom: 20px;
   cursor: pointer;
-  transition: all 0.3s;
-  border-radius: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
   overflow: hidden;
 }
 
 .item-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .item-image {
   width: 100%;
   height: 180px;
   overflow: hidden;
-  background: var(--bg-page);
+  background: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 15px;
-  border-radius: 8px;
+  border-radius: calc(var(--border-radius) - 2px);
+  border: var(--border-width) solid var(--border-color);
 }
 
 .item-image img {
@@ -378,8 +500,8 @@ const onDateChange = () => {
 
 .item-title {
   font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--color-text);
   margin-bottom: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -404,7 +526,7 @@ const onDateChange = () => {
   gap: 8px;
   margin-bottom: 12px;
   padding-top: 12px;
-  border-top: 1px solid #eee;
+  border-top: var(--border-width) solid var(--border-color);
 }
 
 .meta-item {
@@ -420,7 +542,23 @@ const onDateChange = () => {
   justify-content: space-between;
   align-items: center;
   padding-top: 12px;
-  border-top: 1px solid #eee;
+  border-top: var(--border-width) solid var(--border-color);
+}
+
+.item-footer :deep(.el-button) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-weight: 700;
+  background: var(--color-accent);
+  color: white !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.item-footer :deep(.el-button:hover) {
+  background: var(--color-accent) !important;
+  color: white !important;
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 .user-info {
@@ -432,12 +570,32 @@ const onDateChange = () => {
 }
 
 .skeleton-bg {
-  background: var(--bg-page);
+  background: var(--color-primary);
 }
 
 .pagination-bar {
   display: flex;
   justify-content: center;
   padding: 20px 0;
+}
+
+.pagination-bar :deep(.el-pagination) {
+  --el-pagination-button-bg-color: var(--color-card);
+  --el-pagination-button-color: var(--color-text);
+  --el-pagination-hover-color: var(--color-accent);
+}
+
+.pagination-bar :deep(.el-pager li) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  margin: 0 2px;
+  font-weight: 600;
+}
+
+.pagination-bar :deep(.el-pagination .btn-prev),
+.pagination-bar :deep(.el-pagination .btn-next) {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-weight: 600;
 }
 </style>
