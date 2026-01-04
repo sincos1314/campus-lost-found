@@ -11,8 +11,13 @@
         🚀 校园生活更便利
       </div>
 
-      <!-- 主标题 -->
-      <h1 class="hero-title">
+      <!-- 主标题 - 闪卡效果 -->
+      <h1 
+        class="hero-title holographic-text"
+        ref="titleRef"
+        @mousemove="handleMouseMove"
+        @mouseleave="handleMouseLeave"
+      >
         哎呀，东西丢了吗？
       </h1>
 
@@ -74,6 +79,7 @@ import { ElMessage } from 'element-plus'
 import request from '../utils/request'
 
 const router = useRouter()
+const titleRef = ref(null)
 
 const stats = ref([
   { key: 'users', label: '注册用户数', icon: '👥', value: 0, color: '#3B82F6' },
@@ -146,6 +152,38 @@ const goToPost = () => {
     return
   }
   router.push('/post')
+}
+
+// 闪卡效果：处理鼠标移动
+const handleMouseMove = (e) => {
+  if (!titleRef.value) return
+  
+  const rect = titleRef.value.getBoundingClientRect()
+  const centerX = rect.left + rect.width / 2
+  const centerY = rect.top + rect.height / 2
+  
+  // 计算鼠标相对于元素中心的位置（-1 到 1）
+  const x = (e.clientX - centerX) / (rect.width / 2)
+  const y = (e.clientY - centerY) / (rect.height / 2)
+  
+  // 计算倾斜角度（最大15度）
+  const rotateX = y * 15
+  const rotateY = -x * 15
+  
+  // 计算渐变角度（0-360度）
+  const gradientAngle = Math.atan2(y, x) * (180 / Math.PI) + 180
+  
+  // 应用3D变换
+  titleRef.value.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1)`
+  
+  // 更新渐变角度
+  titleRef.value.style.setProperty('--gradient-angle', `${gradientAngle}deg`)
+}
+
+// 鼠标离开时恢复
+const handleMouseLeave = () => {
+  if (!titleRef.value) return
+  titleRef.value.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)'
 }
 
 onMounted(() => {
@@ -222,7 +260,7 @@ onMounted(() => {
   padding: 0.5rem 1.2rem;
   font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   transform: rotate(-2deg);
   box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -239,18 +277,117 @@ onMounted(() => {
   font-weight: 900;
   line-height: 1.1;
   margin: 0 0 1.5rem 0;
-  color: var(--color-text);
-  /* 白色描边效果 */
-  text-shadow: 
-    -2px -2px 0 #fff,
-    2px -2px 0 #fff,
-    -2px 2px 0 #fff,
-    2px 2px 0 #fff,
-    -3px -3px 0 #fff,
-    3px -3px 0 #fff,
-    -3px 3px 0 #fff,
-    3px 3px 0 #fff;
   letter-spacing: -0.02em;
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  transition: transform 0.1s ease-out;
+  transform-style: preserve-3d;
+}
+
+/* 闪卡全息效果 */
+.holographic-text {
+  /* 全息彩虹渐变背景 */
+  background: linear-gradient(
+    var(--gradient-angle, 135deg),
+    #ff006e 0%,
+    #8338ec 15%,
+    #3a86ff 30%,
+    #06ffa5 45%,
+    #ffbe0b 60%,
+    #fb5607 75%,
+    #ff006e 90%,
+    #8338ec 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  
+  /* 基础文字颜色作为后备（当渐变不支持时） */
+  color: var(--color-text);
+  
+  /* 多层阴影增强立体感和清晰度 */
+  text-shadow: 
+    /* 主阴影 - 根据主题调整 */
+    0 0 0 var(--color-text),
+    0 0 0 var(--color-text),
+    /* 外发光效果 - 彩色光晕 */
+    0 0 20px rgba(255, 0, 110, 0.3),
+    0 0 40px rgba(131, 56, 236, 0.3),
+    0 0 60px rgba(58, 134, 255, 0.2),
+    /* 硬阴影 - 新野兽派风格 */
+    4px 4px 0px rgba(0, 0, 0, 0.15);
+  
+  /* 确保文字清晰渲染 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  
+  /* 添加轻微的光泽效果 */
+  filter: brightness(1.1) contrast(1.05);
+}
+
+/* 暗色主题下的闪卡效果 */
+body.dark .holographic-text {
+  /* 暗色主题下使用更亮的渐变 */
+  background: linear-gradient(
+    var(--gradient-angle, 135deg),
+    #ff006e 0%,
+    #8338ec 15%,
+    #3a86ff 30%,
+    #06ffa5 45%,
+    #ffbe0b 60%,
+    #fb5607 75%,
+    #ff006e 90%,
+    #8338ec 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  
+  /* 更亮的阴影效果 */
+  text-shadow: 
+    0 0 0 var(--color-text),
+    0 0 0 var(--color-text),
+    0 0 25px rgba(255, 0, 110, 0.5),
+    0 0 50px rgba(131, 56, 236, 0.4),
+    0 0 75px rgba(58, 134, 255, 0.3),
+    4px 4px 0px rgba(255, 255, 255, 0.1);
+  
+  filter: brightness(1.2) contrast(1.1);
+}
+
+/* 亮色主题下的闪卡效果 */
+body:not(.dark) .holographic-text {
+  /* 亮色主题下使用更饱和的渐变 */
+  background: linear-gradient(
+    var(--gradient-angle, 135deg),
+    #ff006e 0%,
+    #8338ec 15%,
+    #3a86ff 30%,
+    #06ffa5 45%,
+    #ffbe0b 60%,
+    #fb5607 75%,
+    #ff006e 90%,
+    #8338ec 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  
+  /* 柔和的阴影效果 */
+  text-shadow: 
+    0 0 0 var(--color-text),
+    0 0 0 var(--color-text),
+    0 0 20px rgba(255, 0, 110, 0.25),
+    0 0 40px rgba(131, 56, 236, 0.2),
+    0 0 60px rgba(58, 134, 255, 0.15),
+    4px 4px 0px rgba(0, 0, 0, 0.2);
+  
+  filter: brightness(1.05) contrast(1.02);
 }
 
 /* 副标题 */

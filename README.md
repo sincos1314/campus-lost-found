@@ -19,6 +19,7 @@
   - [前端部署](#前端部署)
 - [使用指南](#使用指南)
 - [项目结构](#项目结构)
+- [云服务器部署指南](#云服务器部署指南)
 - [常见问题](#常见问题)
 - [开发说明](#开发说明)
 
@@ -440,6 +441,668 @@ lost-found-system/
 │   └── campus-lost-found-backend.service  # 系统服务配置
 │
 └── README.md               # 项目说明文档（本文件）
+```
+
+---
+
+## ☁️ 云服务器部署指南
+
+本指南将帮助您将 UniFind 校园寻宝系统部署到云服务器上（以阿里云轻量应用服务器为例）。
+
+### 📋 部署前准备
+
+#### 服务器要求
+- **操作系统**：Linux（推荐 Ubuntu、CentOS 或 Alibaba Cloud Linux）
+- **内存**：建议 2GB 以上
+- **存储**：建议 20GB 以上
+- **网络**：需要公网 IP
+
+#### 需要开放的端口
+- **80端口** (HTTP) - 用于访问网站
+- **443端口** (HTTPS) - 如需启用HTTPS，可选
+- **22端口** (SSH) - 用于远程连接，通常默认已开放
+
+#### 阿里云安全组配置
+1. 登录阿里云控制台
+2. 进入"轻量应用服务器" → 选择您的服务器
+3. 点击"防火墙"或"安全组"
+4. 添加入站规则：
+   - 端口范围：`80`
+   - 协议：`TCP`
+   - 授权对象：`0.0.0.0/0`
+   - 描述：`HTTP访问`
+
+---
+
+### 🚀 第一步：连接服务器
+
+#### Windows系统（使用PowerShell）
+
+1. **打开PowerShell**
+   - 按 `Win + X`，选择"Windows PowerShell"或"终端"
+
+2. **使用SSH连接服务器**
+   ```powershell
+   ssh root@您的服务器IP
+   ```
+   
+3. **输入密码**
+   - 首次连接会提示确认，输入 `yes`
+   - 然后输入root账户的密码（输入时不会显示，直接输入后按回车）
+
+#### 如果无法连接，检查以下内容：
+- 确认服务器已启动
+- 确认22端口已开放
+- 确认IP地址正确
+- 如果使用密钥登录，需要指定密钥文件：
+  ```powershell
+  ssh -i 密钥文件路径 root@您的服务器IP
+  ```
+
+---
+
+### 🔧 第二步：确定系统类型并安装基础环境
+
+连接成功后，**首先需要确定您的Linux发行版类型**，因为不同的系统使用不同的包管理器。
+
+#### ⚠️ 重要：先确定系统类型
+
+在服务器上运行以下命令来确定系统类型：
+
+```bash
+# 方法一：查看系统信息文件
+cat /etc/os-release
+
+# 方法二：查看发行版信息
+cat /etc/redhat-release 2>/dev/null || cat /etc/issue
+```
+
+**根据输出结果判断**：
+- 如果看到 `Ubuntu` 或 `Debian` → 使用 `apt` 命令
+- 如果看到 `CentOS`、`Rocky`、`RHEL`、`AlmaLinux` → 使用 `yum` 或 `dnf` 命令
+- 如果看到 `Alibaba Cloud Linux` → 使用 `yum` 命令
+
+> 💡 **提示**：Alibaba Cloud Linux 是阿里云基于 CentOS 优化的系统，完全兼容 CentOS 的命令和操作方式。
+
+#### 1. 更新系统软件包
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+apt update && apt upgrade -y
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+yum update -y
+# 或者
+dnf update -y
+```
+
+#### 2. 安装Git
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+apt install -y git
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+yum install -y git
+# 或者
+dnf install -y git
+```
+
+#### 3. 安装Python 3.10+ 和 pip
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+apt install -y python3 python3-venv python3-pip
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+yum install -y python3 python3-pip python3-devel
+# 或者
+dnf install -y python3 python3-pip python3-devel
+```
+
+**验证安装**：
+```bash
+python3 --version  # 应该显示 Python 3.10.x 或更高版本
+pip3 --version     # 应该显示 pip 版本
+```
+
+#### 4. 安装Node.js 和 npm
+
+**方法一：使用NodeSource仓库（推荐）**
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+yum install -y nodejs
+# 或者
+dnf install -y nodejs
+```
+
+**验证安装**：
+```bash
+node --version  # 应该显示 v20.x.x 或更高版本
+npm --version   # 应该显示 npm 版本
+```
+
+#### 5. 安装Nginx
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+apt install -y nginx
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+yum install -y nginx
+# 或者
+dnf install -y nginx
+```
+
+**启动Nginx并设置开机自启**：
+```bash
+systemctl start nginx
+systemctl enable nginx
+```
+
+---
+
+### 📥 第三步：从GitHub拉取项目代码
+
+```bash
+# 进入root目录（或您选择的部署目录）
+cd /root
+
+# 克隆项目
+git clone https://github.com/sincos1314/campus-lost-found.git
+
+# 如果遇到权限问题
+chown -R root:root /root/campus-lost-found
+```
+
+---
+
+### 🐍 第四步：部署后端服务
+
+#### 1. 进入后端目录
+
+```bash
+cd /root/campus-lost-found/backend
+```
+
+#### 2. 创建Python虚拟环境
+
+```bash
+python3 -m venv venv
+```
+
+#### 3. 激活虚拟环境
+
+```bash
+source venv/bin/activate
+```
+
+> ⚠️ **重要提示**：
+> - 激活后，命令行前面会显示 `(venv)` 标识
+> - 每次打开新的终端窗口或重新连接 SSH 时，都需要重新激活虚拟环境
+> - 如果看不到 `(venv)` 标识，说明虚拟环境未激活
+
+#### 4. 安装Python依赖
+
+**⚠️ 重要：先安装 Pillow 编译所需的系统依赖**
+
+**如果是 Ubuntu/Debian 系统**：
+```bash
+apt install -y libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libwebp-dev
+```
+
+**如果是 CentOS/Rocky/RHEL/Alibaba Cloud Linux 系统**：
+```bash
+yum install -y libjpeg-devel zlib-devel libtiff-devel freetype-devel lcms2-devel libwebp-devel
+```
+
+**然后安装 Python 依赖**：
+
+```bash
+# 使用国内镜像加速（推荐）
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 安装 eventlet（Flask-SocketIO 需要）
+pip install eventlet -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+**如果 Pillow 安装失败**（特别是 Python 3.13），可以尝试：
+
+```bash
+# 先安装其他依赖（跳过 Pillow）
+pip install Flask==3.0.0 flask-cors==4.0.0 flask-sqlalchemy==3.1.1 flask-jwt-extended==4.5.3 Werkzeug==3.0.1 openpyxl==3.1.2 flask-socketio==5.3.5 python-socketio==5.10.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 然后安装最新版本的 Pillow
+pip install Pillow -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+#### 5. 生成JWT密钥
+
+```bash
+# 生成一个随机密钥（复制输出的字符串）
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**保存这个密钥**，稍后会用到。
+
+#### 6. 测试后端是否能正常运行
+
+```bash
+# 确保虚拟环境已激活（看到 (venv) 标识）
+# 如果没看到，运行：source venv/bin/activate
+
+# 设置JWT密钥（临时测试用）
+export JWT_SECRET_KEY="刚才生成的密钥"
+
+# 运行后端
+python app.py
+```
+
+如果看到类似以下输出，说明后端运行正常：
+```
+✅ 数据库表创建成功！
+🚀 服务器启动在 http://0.0.0.0:5000
+```
+
+**按 `Ctrl + C` 停止测试**。
+
+#### 7. 配置systemd服务（让后端自动启动）
+
+**7.1 创建服务文件**
+
+```bash
+# 创建服务文件
+cat > /etc/systemd/system/campus-lost-found-backend.service << 'EOF'
+[Unit]
+Description=Campus Lost Found Flask-SocketIO Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/campus-lost-found/backend
+Environment=PYTHONUNBUFFERED=1
+Environment=JWT_SECRET_KEY=YOUR_JWT_SECRET_KEY_HERE
+Environment="PATH=/root/campus-lost-found/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="VIRTUAL_ENV=/root/campus-lost-found/backend/venv"
+ExecStart=/root/campus-lost-found/backend/venv/bin/python /root/campus-lost-found/backend/app.py
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+**7.2 编辑服务文件，设置JWT密钥**
+
+```bash
+nano /etc/systemd/system/campus-lost-found-backend.service
+```
+
+找到 `Environment=JWT_SECRET_KEY=YOUR_JWT_SECRET_KEY_HERE`，替换为您的实际密钥（不要加引号）。
+
+保存文件（`Ctrl + O` → `Enter` → `Ctrl + X`）
+
+**7.3 启动服务**
+
+```bash
+# 重新加载systemd配置
+systemctl daemon-reload
+
+# 设置开机自启
+systemctl enable campus-lost-found-backend
+
+# 启动服务
+systemctl start campus-lost-found-backend
+
+# 查看服务状态
+systemctl status campus-lost-found-backend
+```
+
+如果看到 `active (running)` 表示启动成功！
+
+---
+
+### 🎨 第五步：部署前端
+
+#### 1. 进入前端目录
+
+```bash
+cd /root/campus-lost-found/frontend
+```
+
+#### 2. 创建环境变量文件
+
+```bash
+cat > .env.production << 'EOF'
+# 生产环境配置
+VITE_API_BASE=http://您的服务器IP
+VITE_SOCKET_ORIGIN=http://您的服务器IP
+EOF
+```
+
+**重要**：将 `您的服务器IP` 替换为实际的服务器公网IP地址。
+
+#### 3. 安装前端依赖
+
+```bash
+# 使用国内镜像加速
+npm install --registry=https://registry.npmmirror.com
+```
+
+#### 4. 构建前端项目
+
+```bash
+npm run build
+```
+
+构建完成后，会在 `frontend/dist` 目录生成静态文件。
+
+**验证构建结果**：
+```bash
+ls -la dist/
+```
+
+应该能看到 `index.html` 等文件。
+
+---
+
+### 🌐 第六步：配置Nginx反向代理
+
+#### 1. 创建Nginx配置文件
+
+```bash
+cat > /etc/nginx/conf.d/campus-lost-found.conf << 'EOF'
+server {
+    listen 80;
+    server_name 您的服务器IP;
+
+    root /root/campus-lost-found/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:5000/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /api/image/ {
+        proxy_pass http://127.0.0.1:5000/api/image/;
+    }
+
+    location /api/avatar/ {
+        proxy_pass http://127.0.0.1:5000/api/avatar/;
+    }
+
+    location /api/message-image/ {
+        proxy_pass http://127.0.0.1:5000/api/message-image/;
+    }
+}
+EOF
+```
+
+**重要**：将 `您的服务器IP` 替换为实际的服务器公网IP地址。
+
+#### 2. 设置文件权限
+
+```bash
+# 确保 Nginx 可以访问前端文件
+chmod 755 /root
+chmod -R 755 /root/campus-lost-found
+```
+
+#### 3. 检查并重新加载Nginx
+
+```bash
+# 检查配置
+nginx -t
+
+# 重新加载Nginx
+systemctl reload nginx
+```
+
+---
+
+### ✅ 第七步：验证部署
+
+#### 1. 检查所有服务状态
+
+```bash
+# 检查后端服务
+systemctl status campus-lost-found-backend
+
+# 检查Nginx服务
+systemctl status nginx
+```
+
+#### 2. 在浏览器中访问
+
+打开浏览器，访问：`http://您的服务器IP`
+
+您应该能看到 UniFind 校园寻宝的首页！
+
+---
+
+### ⚠️ 常见部署问题及解决方案
+
+#### 问题1：`apt: command not found` 或 `yum: command not found`
+
+**原因**：不同Linux发行版使用不同的包管理器。
+
+**解决方案**：
+1. 先运行 `cat /etc/os-release` 确定系统类型
+2. Ubuntu/Debian 使用 `apt`
+3. CentOS/RHEL/Alibaba Cloud Linux 使用 `yum` 或 `dnf`
+
+#### 问题2：`ModuleNotFoundError: No module named 'flask'`
+
+**原因**：虚拟环境未激活，或依赖未安装。
+
+**解决方案**：
+1. 确保虚拟环境已激活（命令行前有 `(venv)` 标识）
+2. 如果没看到，运行：`source venv/bin/activate`
+3. 重新安装依赖：`pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple`
+
+#### 问题3：Pillow 安装失败
+
+**原因**：缺少编译依赖或 Python 版本过新。
+
+**解决方案**：
+1. 先安装系统依赖：
+   ```bash
+   # Ubuntu/Debian
+   apt install -y libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libwebp-dev
+   
+   # CentOS/RHEL/Alibaba Cloud Linux
+   yum install -y libjpeg-devel zlib-devel libtiff-devel freetype-devel lcms2-devel libwebp-devel
+   ```
+2. 如果还是失败，安装最新版本的 Pillow：
+   ```bash
+   pip install Pillow -i https://pypi.tuna.tsinghua.edu.cn/simple
+   ```
+
+#### 问题4：`OSError: [Errno 98] Address already in use`
+
+**原因**：端口 5000 已被占用。
+
+**解决方案**：
+```bash
+# 查找占用端口的进程
+ss -tlnp | grep 5000
+# 或
+lsof -i :5000
+
+# 停止占用端口的进程
+kill -9 <PID>
+
+# 停止 systemd 服务（如果正在运行）
+systemctl stop campus-lost-found-backend
+```
+
+#### 问题5：systemd 服务启动失败（status=203/EXEC）
+
+**原因**：虚拟环境中的 Python 路径问题。
+
+**解决方案**：
+1. 检查虚拟环境中的 Python 是否存在：
+   ```bash
+   ls -la /root/campus-lost-found/backend/venv/bin/python
+   ```
+2. 如果不存在，重新创建虚拟环境
+3. 如果存在，检查服务文件中的 `ExecStart` 路径是否正确
+
+#### 问题6：systemd 服务启动失败（ModuleNotFoundError）
+
+**原因**：服务文件中的 Python 路径不正确，使用了系统 Python 而不是虚拟环境中的 Python。
+
+**解决方案**：
+1. 确保服务文件中的 `ExecStart` 使用虚拟环境中的 Python：
+   ```
+   ExecStart=/root/campus-lost-found/backend/venv/bin/python /root/campus-lost-found/backend/app.py
+   ```
+2. 确保设置了 `PATH` 和 `VIRTUAL_ENV` 环境变量
+
+#### 问题7：Nginx 500 错误（Permission denied）
+
+**原因**：Nginx 无法访问 `/root` 目录下的文件。
+
+**解决方案**：
+```bash
+# 方法一：修改目录权限
+chmod 755 /root
+chmod -R 755 /root/campus-lost-found
+
+# 方法二：将文件移动到标准目录（推荐）
+mkdir -p /var/www/campus-lost-found
+cp -r /root/campus-lost-found/frontend/dist/* /var/www/campus-lost-found/
+chown -R nginx:nginx /var/www/campus-lost-found
+# 然后修改 Nginx 配置中的 root 路径为 /var/www/campus-lost-found
+```
+
+#### 问题8：API 请求返回 404
+
+**原因**：Nginx 的 `proxy_pass` 配置错误，路径被重写。
+
+**解决方案**：
+确保 Nginx 配置中的 `location /api/` 使用：
+```
+proxy_pass http://127.0.0.1:5000/api/;
+```
+而不是：
+```
+proxy_pass http://127.0.0.1:5000/;
+```
+
+#### 问题9：端口一直被占用，停止一个进程又出现新的
+
+**原因**：systemd 服务配置了 `Restart=always`，失败后不断重启。
+
+**解决方案**：
+```bash
+# 先停止并禁用服务
+systemctl stop campus-lost-found-backend
+systemctl disable campus-lost-found-backend
+
+# 停止所有占用端口的进程
+pkill -9 -f "app.py"
+
+# 修复问题后，再启动服务
+systemctl enable campus-lost-found-backend
+systemctl start campus-lost-found-backend
+```
+
+#### 问题10：有旧服务占用端口
+
+**原因**：之前部署时创建了其他服务，仍在运行。
+
+**解决方案**：
+```bash
+# 查找所有相关服务
+systemctl list-units --all | grep -E "(backend|python|flask)"
+
+# 停止旧服务
+systemctl stop backend.service  # 如果有的话
+systemctl disable backend.service
+
+# 查找并停止所有占用端口的进程
+lsof -i :5000
+kill -9 <PID>
+```
+
+---
+
+### 🔄 日常维护
+
+#### 查看后端日志
+```bash
+# 实时查看日志
+journalctl -u campus-lost-found-backend -f
+
+# 查看最近100行
+journalctl -u campus-lost-found-backend -n 100
+```
+
+#### 重启服务
+```bash
+# 重启后端
+systemctl restart campus-lost-found-backend
+
+# 重启Nginx
+systemctl restart nginx
+```
+
+#### 更新代码
+```bash
+cd /root/campus-lost-found
+git pull
+
+# 如果后端代码有更新
+systemctl restart campus-lost-found-backend
+
+# 如果前端代码有更新
+cd frontend
+npm run build
+systemctl reload nginx
+```
+
+#### 备份数据库
+```bash
+cp /root/campus-lost-found/backend/lost_found.db /root/lost_found_backup_$(date +%Y%m%d).db
 ```
 
 ---
