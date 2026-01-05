@@ -386,6 +386,11 @@ const deleteItem = async (item) => {
 }
 
 const openEdit = (item) => {
+  // 优先使用 image_urls[0]，如果没有则使用 image_url（向后兼容）
+  const imageUrl = (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) 
+    ? item.image_urls[0] 
+    : (item.image_url || '')
+  
   editForm.value = {
     id: item.id,
     title: item.title,
@@ -396,7 +401,7 @@ const openEdit = (item) => {
     contact_phone: item.contact_phone,
     date: item.date,
     item_type: item.item_type,
-    image_url: item.image_url || ''
+    image_url: imageUrl
   }
   editDialog.value = true
 }
@@ -420,7 +425,10 @@ const handleImageSuccess = async () => {
   ElMessage.success('图片已更新')
   try {
     const updated = await request.get(`/items/${editForm.value.id}`)
-    editForm.value.image_url = updated.image_url || ''
+    // 优先使用 image_urls[0]，如果没有则使用 image_url（向后兼容）
+    editForm.value.image_url = (updated.image_urls && Array.isArray(updated.image_urls) && updated.image_urls.length > 0)
+      ? updated.image_urls[0]
+      : (updated.image_url || '')
     await loadMyItems()
   } catch (e) {
     console.error(e)

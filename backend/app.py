@@ -1000,22 +1000,87 @@ def update_item_image(item_id):
     file = request.files['image']
     if file_too_large(file):
         return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
-    if file.filename == '':
-        return jsonify({'message': '未选择文件'}), 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        # 删除旧图片
-        if item.image_path:
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item.image_path))
-            except:
-                pass
-        item.image_path = filename
-        db.session.commit()
-        return jsonify(item.to_dict())
-    return jsonify({'message': '不支持的图片格式'}), 400
+    
+    # 处理文件名为空或 blob 的情况
+    original_filename = file.filename if hasattr(file, 'filename') else None
+    if not original_filename or original_filename.lower() == 'blob':
+        content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+        ext_map = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+            'image/bmp': 'bmp'
+        }
+        ext = ext_map.get(content_type, 'jpg')
+        original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+    
+    if not allowed_file(original_filename):
+        return jsonify({'message': '不支持的图片格式'}), 400
+    
+    # 生成新的文件名（确保唯一性）
+    timestamp = datetime.now().timestamp()
+    # 提取文件扩展名
+    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+    
+    # 清理文件名：去除可能已存在的时间戳和特殊字符
+    # 如果文件名包含 _compressed，提取基础名称
+    if '_compressed.' in original_filename:
+        # 例如：image_1767607666.480782_compressed.jpg -> image.jpg
+        base_parts = original_filename.split('_compressed.')[0]
+        # 去除时间戳部分（如果存在）
+        if base_parts.count('_') > 0:
+            # 尝试提取最后一个有意义的部分
+            parts = base_parts.split('_')
+            # 如果最后一部分看起来像时间戳（纯数字），忽略它
+            if len(parts) > 1 and parts[-1].replace('.', '').isdigit():
+                base_name = '_'.join(parts[:-1]) if len(parts) > 2 else 'image'
+            else:
+                base_name = base_parts
+        else:
+            base_name = base_parts
+        filename = secure_filename(f"{timestamp}_{base_name}.{ext}")
+    else:
+        # 去除可能已存在的时间戳前缀（格式：数字_文件名）
+        # 检查是否以数字开头（可能是时间戳）
+        parts = original_filename.split('_', 1)
+        if len(parts) == 2 and parts[0].replace('.', '').isdigit():
+            # 去除时间戳前缀
+            clean_name = parts[1]
+        else:
+            clean_name = original_filename
+        filename = secure_filename(f"{timestamp}_{clean_name}")
+    
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    # 删除旧图片（包括单图和多图中的旧图片）
+    old_paths_to_delete = []
+    if item.image_path:
+        old_paths_to_delete.append(item.image_path)
+    if item.images_path:
+        try:
+            old_paths = json.loads(item.images_path)
+            if isinstance(old_paths, list):
+                old_paths_to_delete.extend(old_paths)
+        except:
+            pass
+    
+    for old_path in old_paths_to_delete:
+        try:
+            old_filepath = os.path.join(app.config['UPLOAD_FOLDER'], old_path)
+            if os.path.exists(old_filepath):
+                os.remove(old_filepath)
+        except Exception as e:
+            print(f'[DEBUG] 删除旧图片失败: {old_path}, 错误: {e}')
+    
+    # 更新图片路径（单图和多图都更新为新的单张图片）
+    item.image_path = filename
+    item.images_path = json.dumps([filename])  # 更新为只包含新图片的数组
+    db.session.commit()
+    
+    return jsonify(item.to_dict())
 
 @app.route('/api/items/<int:item_id>/image', methods=['DELETE'])
 @jwt_required()
@@ -1065,7 +1130,17 @@ def delete_item(item_id):
 
 @app.route('/api/image/<path:filename>')
 def get_image(filename):
-    return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # 安全检查：确保文件路径在 UPLOAD_FOLDER 内
+        if not os.path.abspath(filepath).startswith(os.path.abspath(app.config['UPLOAD_FOLDER'])):
+            return jsonify({'message': '无效的文件路径'}), 403
+        if not os.path.exists(filepath):
+            return jsonify({'message': '图片不存在'}), 404
+        return send_file(filepath)
+    except Exception as e:
+        print(f'[ERROR] 获取图片失败: {filename}, 错误: {e}')
+        return jsonify({'message': '获取图片失败'}), 500
 
 
 @app.route('/api/avatar/<path:filename>')
