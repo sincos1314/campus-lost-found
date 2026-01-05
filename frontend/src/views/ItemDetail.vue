@@ -338,9 +338,43 @@ const contactPublisher = async () => {
 };
 
 // 复制电话
-const copyPhone = () => {
-  navigator.clipboard.writeText(item.value.contact_phone);
-  ElMessage.success("电话已复制到剪贴板");
+const copyPhone = async () => {
+  const phone = item.value.contact_phone;
+  
+  // 优先使用现代剪贴板 API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(phone);
+      ElMessage.success("电话已复制到剪贴板");
+      return;
+    } catch (err) {
+      console.warn('剪贴板 API 失败，尝试降级方案:', err);
+    }
+  }
+  
+  // 降级方案：使用传统的 execCommand 方法
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = phone;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    if (successful) {
+      ElMessage.success("电话已复制到剪贴板");
+    } else {
+      ElMessage.error("复制失败，请手动复制");
+    }
+  } catch (err) {
+    console.error('复制失败:', err);
+    ElMessage.error("复制失败，请手动复制");
+  }
 };
 
 // 标记为已解决
@@ -394,10 +428,43 @@ onMounted(() => {
   loadItemDetail();
 });
 
-const copyLink = () => {
+const copyLink = async () => {
   const url = window.location.href;
-  navigator.clipboard.writeText(url);
-  ElMessage.success("链接已复制到剪贴板");
+  
+  // 优先使用现代剪贴板 API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(url);
+      ElMessage.success("链接已复制到剪贴板");
+      return;
+    } catch (err) {
+      console.warn('剪贴板 API 失败，尝试降级方案:', err);
+    }
+  }
+  
+  // 降级方案：使用传统的 execCommand 方法
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = url;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    if (successful) {
+      ElMessage.success("链接已复制到剪贴板");
+    } else {
+      ElMessage.error("复制失败，请手动复制链接");
+    }
+  } catch (err) {
+    console.error('复制失败:', err);
+    ElMessage.error("复制失败，请手动复制链接");
+  }
 };
 
 const openShare = () => {
