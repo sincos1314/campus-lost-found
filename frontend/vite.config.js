@@ -22,16 +22,11 @@ export default defineConfig(({ mode }) => ({
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 2000,
-    // 优化构建以减少内存使用
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false,
-      },
-    },
+    // 使用 esbuild 压缩（更快，不需要额外依赖）
+    minify: 'esbuild',
     rollupOptions: {
       output: {
-        // 代码分割，减少单个文件大小
+        // 代码分割，减少单个文件大小和内存占用
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router'],
           'element-plus': ['element-plus'],
