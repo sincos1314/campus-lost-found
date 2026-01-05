@@ -843,6 +843,9 @@ server {
     listen 80;
     server_name 您的服务器IP;
 
+    # 增加请求体大小限制（支持最多8张图片，每张10MB，总计80MB，设置为100MB留有余地）
+    client_max_body_size 100M;
+
     root /root/campus-lost-found/frontend/dist;
     index index.html;
 
@@ -857,6 +860,10 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # 增加超时时间，支持大文件上传
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
     }
 
     location /socket.io/ {
@@ -871,14 +878,26 @@ server {
 
     location /api/image/ {
         proxy_pass http://127.0.0.1:5000/api/image/;
+        client_max_body_size 100M;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
     }
 
     location /api/avatar/ {
         proxy_pass http://127.0.0.1:5000/api/avatar/;
+        client_max_body_size 100M;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
     }
 
     location /api/message-image/ {
         proxy_pass http://127.0.0.1:5000/api/message-image/;
+        client_max_body_size 100M;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
     }
 }
 EOF

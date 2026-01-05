@@ -142,7 +142,7 @@
           </div>
           <div class="upload-tip">
             <el-text type="info" size="small">
-              支持 jpg、png、gif 格式，每张大小不超过10MB，最多上传8张，第一张将作为主图
+              支持 jpg、png、gif 格式，每张大小不超过10MB，最多上传8张，总大小不超过80MB，第一张将作为主图
             </el-text>
           </div>
         </el-form-item>
@@ -206,7 +206,8 @@ const handleImageChange = (file, fileList) => {
   }
 
   const isImage = file.raw.type.startsWith('image/')
-  const isLt10M = file.raw.size / 1024 / 1024 < 10
+  const fileSizeMB = file.raw.size / 1024 / 1024
+  const isLt10M = fileSizeMB < 10
 
   if (!isImage) {
     ElMessage.error('只能上传图片文件！')
@@ -214,6 +215,17 @@ const handleImageChange = (file, fileList) => {
   }
   if (!isLt10M) {
     ElMessage.error('图片大小不能超过10MB！')
+    return false
+  }
+
+  // 检查总大小（8张 × 10MB = 80MB）
+  const currentTotalSize = imageList.value.reduce((sum, img) => sum + img.file.size, 0)
+  const newTotalSize = currentTotalSize + file.raw.size
+  const maxTotalSize = 80 * 1024 * 1024 // 80MB
+
+  if (newTotalSize > maxTotalSize) {
+    const currentTotalMB = (currentTotalSize / 1024 / 1024).toFixed(2)
+    ElMessage.error(`图片总大小不能超过80MB！当前已上传 ${currentTotalMB}MB，此图片 ${fileSizeMB.toFixed(2)}MB`)
     return false
   }
 
