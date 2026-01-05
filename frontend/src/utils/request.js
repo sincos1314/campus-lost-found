@@ -14,8 +14,15 @@ export const absoluteUrl = (path) => {
   return path.startsWith('http') ? path : `${API_ORIGIN}${path}`
 }
 export const previewList = (path) => {
+  if (!path) return []
   const u = absoluteUrl(path)
   return u ? [u] : []
+}
+
+// 支持多张图片的预览列表
+export const previewListMultiple = (urls) => {
+  if (!urls || !Array.isArray(urls)) return []
+  return urls.map(url => absoluteUrl(url)).filter(url => url)
 }
 
 // 请求拦截器

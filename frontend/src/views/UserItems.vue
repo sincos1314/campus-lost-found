@@ -37,7 +37,7 @@
       <el-col v-for="item in items" :key="item.id" :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="item-card" shadow="hover" @click="goToDetail(item.id)">
           <div class="item-image">
-            <img v-if="item.image_url" :src="absoluteUrl(item.image_url)" />
+            <img v-if="getItemImageUrl(item)" :src="absoluteUrl(getItemImageUrl(item))" />
             <div v-else class="no-image">
               <el-icon :size="50"><Picture /></el-icon>
               <span>暂无图片</span>
@@ -101,6 +101,16 @@ const loadItems = async () => {
 
 const onPageChange = (p) => { page.value = p; loadItems() }
 const goToDetail = (id) => router.push(`/item/${id}`)
+
+// 获取物品的图片URL（支持多张图片）
+const getItemImageUrl = (item) => {
+  // 优先使用 image_urls（多张图片）
+  if (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
+    return item.image_urls[0]
+  }
+  // 向后兼容：使用 image_url
+  return item.image_url || null
+}
 
 loadItems()
 </script>

@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import os
 import base64
+import json
 from openpyxl import Workbook
 from io import BytesIO
 
@@ -141,12 +142,27 @@ class Item(db.Model):
     contact_name = db.Column(db.String(50), nullable=False)
     contact_phone = db.Column(db.String(20), nullable=False)
     date = db.Column(db.String(20), nullable=False)
-    image_path = db.Column(db.String(200))
+    image_path = db.Column(db.String(200))  # 主图（向后兼容）
+    images_path = db.Column(db.Text)  # 多张图片路径（JSON格式）
     created_at = db.Column(db.DateTime, default=datetime.now)
     status = db.Column(db.String(20), default='open')
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def to_dict(self):
+        # 处理多张图片
+        image_urls = []
+        if self.images_path:
+            try:
+                image_paths = json.loads(self.images_path)
+                if isinstance(image_paths, list):
+                    image_urls = [f'/api/image/{path}' for path in image_paths if path]
+            except:
+                pass
+        
+        # 向后兼容：如果没有多张图片但有主图，使用主图
+        if not image_urls and self.image_path:
+            image_urls = [f'/api/image/{self.image_path}']
+        
         return {
             'id': self.id,
             'title': self.title,
@@ -157,7 +173,8 @@ class Item(db.Model):
             'contact_name': self.contact_name,
             'contact_phone': self.contact_phone,
             'date': self.date,
-            'image_url': f'/api/image/{self.image_path}' if self.image_path else None,
+            'image_url': image_urls[0] if image_urls else None,  # 主图（向后兼容）
+            'image_urls': image_urls,  # 所有图片列表
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'status': self.status,
             'user_id': self.user_id,
@@ -346,6 +363,21 @@ with app.app_context():
         conn.close()
     except Exception as e:
         print(f'report migration skipped: {e}')
+
+    try:
+        import sqlite3
+        conn = sqlite3.connect(os.path.join(basedir, 'lost_found.db'))
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(item)")
+        cols = [row[1] for row in cur.fetchall()]
+        # 添加多张图片路径字段
+        if 'images_path' not in cols:
+            cur.execute("ALTER TABLE item ADD COLUMN images_path TEXT")
+        conn.commit()
+        conn.close()
+        print('✅ Item 表迁移成功：已添加 images_path 字段')
+    except Exception as e:
+        print(f'item migration skipped: {e}')
 
 # 文件上传辅助函数
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
@@ -793,15 +825,36 @@ def create_item():
         return jsonify({'message': '账户已被封禁，无法发布'}), 403
     data = request.form.to_dict()
     
-    # 处理图片上传
-    image_path = None
+    # 处理多张图片上传
+    image_paths = []
+    
+    # 处理主图（image）
     if 'image' in request.files:
         file = request.files['image']
-        if file and allowed_file(file.filename):
+        if file and file.filename and allowed_file(file.filename):
+            if file_too_large(file):
+                return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
             filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-            image_path = filename
+            image_paths.append(filename)
+    
+    # 处理副图（images）
+    if 'images' in request.files:
+        files = request.files.getlist('images')
+        for file in files:
+            if file and file.filename and allowed_file(file.filename):
+                if file_too_large(file):
+                    continue  # 跳过过大的文件
+                filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                image_paths.append(filename)
+    
+    # 保存图片路径（JSON格式）
+    images_path_json = json.dumps(image_paths) if image_paths else None
+    # 向后兼容：保存第一张作为主图
+    image_path = image_paths[0] if image_paths else None
     
     new_item = Item(
         title=data['title'],
@@ -812,7 +865,8 @@ def create_item():
         contact_name=data['contact_name'],
         contact_phone=data['contact_phone'],
         date=data['date'],
-        image_path=image_path,
+        image_path=image_path,  # 向后兼容
+        images_path=images_path_json,  # 多张图片
         user_id=user_id
     )
     

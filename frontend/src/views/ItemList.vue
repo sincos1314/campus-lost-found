@@ -120,8 +120,8 @@
         >
           <div class="item-image">
             <img
-              v-if="item.image_url"
-              :src="absoluteUrl(item.image_url)"
+              v-if="getItemImageUrl(item)"
+              :src="absoluteUrl(getItemImageUrl(item))"
               class="image-zoom"
             />
             <div v-else class="no-image">
@@ -239,6 +239,16 @@ const loadItems = async () => {
 const goToDetail = (id) => {
   router.push(`/item/${id}`);
 };
+
+// 获取物品的图片URL（支持多张图片）
+const getItemImageUrl = (item) => {
+  // 优先使用 image_urls（多张图片）
+  if (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
+    return item.image_urls[0]
+  }
+  // 向后兼容：使用 image_url
+  return item.image_url || null
+}
 
 const handleExport = async () => {
   try {

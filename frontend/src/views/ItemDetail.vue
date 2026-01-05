@@ -11,23 +11,59 @@
         <!-- 左侧：图片 -->
         <el-col :xs="24" :sm="24" :md="10">
           <div class="image-section">
-            <el-image
-              v-if="item.image_url"
-              :src="fullImageUrl"
-              :preview-src-list="previewList(item.image_url)"
-              fit="cover"
-              class="item-image"
-            >
-              <template #error>
-                <div class="image-placeholder">
-                  <el-icon :size="60"><Picture /></el-icon>
-                  <p>暂无图片</p>
+            <!-- 多张图片显示 -->
+            <div v-if="imageUrls && imageUrls.length > 0" class="images-container">
+              <el-image
+                :src="absoluteUrl(imageUrls[currentMainImageIndex])"
+                :preview-src-list="previewImageUrls"
+                fit="cover"
+                class="item-image main-image"
+              >
+                <template #error>
+                  <div class="image-placeholder">
+                    <el-icon :size="60"><Picture /></el-icon>
+                    <p>图片加载失败</p>
+                  </div>
+                </template>
+              </el-image>
+              <!-- 多张图片缩略图 -->
+              <div v-if="imageUrls.length > 1" class="thumbnail-list">
+                <div
+                  v-for="(url, index) in imageUrls"
+                  :key="index"
+                  class="thumbnail-item"
+                  :class="{ active: index === 0 }"
+                  @click="switchMainImage(index)"
+                >
+                  <el-image
+                    :src="absoluteUrl(url)"
+                    fit="cover"
+                    class="thumbnail-image"
+                  />
+                  <div class="thumbnail-overlay">{{ index + 1 }}</div>
                 </div>
-              </template>
-            </el-image>
-            <div v-else class="image-placeholder">
-              <el-icon :size="60"><Picture /></el-icon>
-              <p>暂无图片</p>
+              </div>
+            </div>
+            <!-- 单张图片或没有图片 -->
+            <div v-else>
+              <el-image
+                v-if="item.image_url"
+                :src="fullImageUrl"
+                :preview-src-list="previewList(item.image_url)"
+                fit="cover"
+                class="item-image"
+              >
+                <template #error>
+                  <div class="image-placeholder">
+                    <el-icon :size="60"><Picture /></el-icon>
+                    <p>暂无图片</p>
+                  </div>
+                </template>
+              </el-image>
+              <div v-else class="image-placeholder">
+                <el-icon :size="60"><Picture /></el-icon>
+                <p>暂无图片</p>
+              </div>
             </div>
           </div>
         </el-col>
@@ -205,7 +241,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import ReportDialog from "../components/ReportDialog.vue";
 import request from "../utils/request";
 import { isLoggedIn, getUser } from "../utils/auth";
-import { absoluteUrl, previewList } from '../utils/request'
+import { absoluteUrl, previewList, previewListMultiple } from '../utils/request'
 
 const route = useRoute();
 const router = useRouter();
@@ -217,7 +253,38 @@ const timeline = ref([]);
 const shareVisible = ref(false);
 const qrUrl = ref("");
 const reportVisible = ref(false);
+const currentMainImageIndex = ref(0);
 const fullImageUrl = computed(() => item.value?.image_url ? absoluteUrl(item.value.image_url) : '')
+
+// 获取所有图片URL（支持多张图片）
+const imageUrls = computed(() => {
+  if (item.value?.image_urls && Array.isArray(item.value.image_urls) && item.value.image_urls.length > 0) {
+    return item.value.image_urls
+  }
+  // 向后兼容：如果没有 image_urls，使用 image_url
+  if (item.value?.image_url) {
+    return [item.value.image_url]
+  }
+  return []
+})
+
+// 预览图片列表
+const previewImageUrls = computed(() => {
+  return previewListMultiple(imageUrls.value)
+})
+
+// 切换主图
+const switchMainImage = (index) => {
+  currentMainImageIndex.value = index
+  // 重新排列数组，将选中的图片放到第一位
+  if (index > 0 && imageUrls.value.length > 1) {
+    const newUrls = [...imageUrls.value]
+    const selected = newUrls.splice(index, 1)[0]
+    newUrls.unshift(selected)
+    item.value.image_urls = newUrls
+    currentMainImageIndex.value = 0
+  }
+}
 
 // 过滤时间线：只显示"发布"和"物品已找回"，并修改"物品已找回"的描述
 const filteredTimeline = computed(() => {
@@ -391,10 +458,75 @@ const onReported = () => {
 
 .image-section {
   width: 100%;
-  aspect-ratio: 1;
   border-radius: var(--border-radius);
   overflow: hidden;
   border: var(--border-width) solid var(--border-color);
+}
+
+.images-container {
+  width: 100%;
+}
+
+.main-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+
+.thumbnail-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.thumbnail-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.thumbnail-item:hover {
+  border-color: var(--color-accent);
+  transform: scale(1.05);
+}
+
+.thumbnail-item.active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.thumbnail-item:hover .thumbnail-overlay {
+  opacity: 1;
 }
 
 .item-image {
