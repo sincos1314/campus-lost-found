@@ -24,13 +24,25 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 2000,
     // 使用 esbuild 压缩（更快，不需要额外依赖）
     minify: 'esbuild',
+    // 减少内存占用：禁用某些优化
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        // 代码分割，减少单个文件大小和内存占用
-        manualChunks: {
-          'vue-vendor': ['vue', 'vue-router'],
-          'element-plus': ['element-plus'],
-          'element-icons': ['@element-plus/icons-vue'],
+        // 更细粒度的代码分割，减少单个文件大小和内存占用
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('vue') || id.includes('vue-router')) {
+              return 'vue-vendor'
+            }
+            if (id.includes('element-plus')) {
+              return 'element-plus'
+            }
+            if (id.includes('@element-plus/icons-vue')) {
+              return 'element-icons'
+            }
+            // 其他 node_modules 也分割
+            return 'vendor'
+          }
         },
       },
     },
