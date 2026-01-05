@@ -22,5 +22,22 @@ export default defineConfig(({ mode }) => ({
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 2000,
+    // 优化构建以减少内存使用
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: false,
+      },
+    },
+    rollupOptions: {
+      output: {
+        // 代码分割，减少单个文件大小
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router'],
+          'element-plus': ['element-plus'],
+          'element-icons': ['@element-plus/icons-vue'],
+        },
+      },
+    },
   }
 }))
