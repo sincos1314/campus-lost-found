@@ -229,6 +229,13 @@ const loadItems = async () => {
     const res = await request.get("/items", { params });
     items.value = res.items || [];
     total.value = res.total || 0;
+    
+    // 调试：检查返回的数据
+    if (items.value.length > 0) {
+      console.log('[DEBUG] 第一个物品数据:', items.value[0])
+      console.log('[DEBUG] image_url:', items.value[0].image_url)
+      console.log('[DEBUG] image_urls:', items.value[0].image_urls)
+    }
   } catch (error) {
     console.error("加载数据失败:", error);
   } finally {

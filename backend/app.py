@@ -831,30 +831,84 @@ def create_item():
     # 处理主图（image）
     if 'image' in request.files:
         file = request.files['image']
-        if file and file.filename and allowed_file(file.filename):
-            if file_too_large(file):
-                return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
-            filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            image_paths.append(filename)
-    
-    # 处理副图（images）
-    if 'images' in request.files:
-        files = request.files.getlist('images')
-        for file in files:
-            if file and file.filename and allowed_file(file.filename):
+        if file:
+            original_filename = file.filename if hasattr(file, 'filename') else None
+            
+            # 如果文件名为空或者是 "blob"，生成一个默认文件名
+            if not original_filename or original_filename.lower() == 'blob':
+                content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+                ext_map = {
+                    'image/jpeg': 'jpg',
+                    'image/jpg': 'jpg',
+                    'image/png': 'png',
+                    'image/gif': 'gif',
+                    'image/webp': 'webp',
+                    'image/bmp': 'bmp'
+                }
+                ext = ext_map.get(content_type, 'jpg')
+                original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+                print(f'[DEBUG] 主图生成默认文件名: {original_filename}')
+            
+            if original_filename and allowed_file(original_filename):
                 if file_too_large(file):
-                    continue  # 跳过过大的文件
-                filename = secure_filename(f"{datetime.now().timestamp()}_{file.filename}")
+                    return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
+                filename = secure_filename(f"{datetime.now().timestamp()}_{original_filename}")
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
                 image_paths.append(filename)
+                print(f'[DEBUG] 主图已保存: {filename}')
+    
+    # 处理副图（images）- 使用 getlist 获取所有同名文件
+    # Flask 的 request.files.getlist 即使字段不存在也会返回空列表，不会报错
+    files = request.files.getlist('images')
+    print(f'[DEBUG] 获取到 {len(files)} 张副图')
+    for idx, file in enumerate(files):
+        if not file:
+            print(f'[DEBUG] 第 {idx+1} 张副图为空，跳过')
+            continue
+            
+        original_filename = file.filename if hasattr(file, 'filename') else None
+        print(f'[DEBUG] 处理第 {idx+1} 张副图: {original_filename}')
+        
+        # 如果文件名为空或者是 "blob"，生成一个默认文件名
+        if not original_filename or original_filename.lower() == 'blob':
+            # 根据文件内容类型确定扩展名
+            content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+            ext_map = {
+                'image/jpeg': 'jpg',
+                'image/jpg': 'jpg',
+                'image/png': 'png',
+                'image/gif': 'gif',
+                'image/webp': 'webp',
+                'image/bmp': 'bmp'
+            }
+            ext = ext_map.get(content_type, 'jpg')
+            original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+            print(f'[DEBUG] 生成默认文件名: {original_filename}')
+        
+        # 检查文件扩展名
+        if not allowed_file(original_filename):
+            print(f'[DEBUG] 文件扩展名不允许: {original_filename}')
+            continue
+            
+        if file_too_large(file):
+            print(f'[DEBUG] 跳过过大的文件: {original_filename}')
+            continue  # 跳过过大的文件
+            
+        filename = secure_filename(f"{datetime.now().timestamp()}_{original_filename}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        image_paths.append(filename)
+        print(f'[DEBUG] 副图已保存: {filename}')
     
     # 保存图片路径（JSON格式）
     images_path_json = json.dumps(image_paths) if image_paths else None
     # 向后兼容：保存第一张作为主图
     image_path = image_paths[0] if image_paths else None
+    
+    print(f'[DEBUG] 上传的图片数量: {len(image_paths)}')
+    print(f'[DEBUG] 图片路径列表: {image_paths}')
+    print(f'[DEBUG] images_path_json: {images_path_json}')
     
     new_item = Item(
         title=data['title'],
@@ -873,6 +927,11 @@ def create_item():
     db.session.add(new_item)
     db.session.commit()
     
+    # 验证保存的数据
+    print(f'[DEBUG] 保存后的 images_path: {new_item.images_path}')
+    item_dict = new_item.to_dict()
+    print(f'[DEBUG] 返回的 image_urls: {item_dict.get("image_urls", [])}')
+    
     # 创建通知
     user = User.query.get(user_id)
     create_notification(
@@ -883,7 +942,7 @@ def create_item():
         new_item.id
     )
     
-    return jsonify(new_item.to_dict()), 201
+    return jsonify(item_dict), 201
 
 
 @app.route('/api/items/<int:item_id>', methods=['PUT'])

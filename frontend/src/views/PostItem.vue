@@ -237,7 +237,18 @@ const handleImageChange = async (file, fileList) => {
       duration: 0 // 不自动关闭
     })
 
-    const compressedFile = await imageCompression(file.raw, options)
+    const compressedBlob = await imageCompression(file.raw, options)
+    
+    // 将 Blob 转换为 File 对象，保留原始文件名
+    // 如果原始文件名不存在，生成一个带时间戳的文件名
+    const originalName = file.raw.name || `image_${Date.now()}.jpg`
+    const fileExtension = originalName.split('.').pop() || 'jpg'
+    const fileName = originalName.replace(/\.[^/.]+$/, '') || 'image'
+    const compressedFile = new File(
+      [compressedBlob], 
+      `${fileName}_compressed.${fileExtension}`, 
+      { type: compressedBlob.type || file.raw.type }
+    )
     
     // 关闭加载提示
     loadingMessage.close()
@@ -270,7 +281,7 @@ const handleImageChange = async (file, fileList) => {
         return
       }
       imageList.value.push({
-        file: compressedFile, // 使用压缩后的文件
+        file: compressedFile, // 使用压缩后的文件（现在是 File 对象，有正确的文件名）
         preview: e.target.result,
         originalFile: file.raw // 保存原文件引用（如果需要）
       })
@@ -326,9 +337,19 @@ const handleSubmit = async () => {
         }
       })
 
-      await request.post('/items', formData, {
+      // 调试：检查 FormData 内容
+      console.log('[DEBUG] 准备上传的图片数量:', imageList.value.length)
+      for (let pair of formData.entries()) {
+        console.log('[DEBUG] FormData:', pair[0], pair[1])
+      }
+
+      const response = await request.post('/items', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
+      
+      console.log('[DEBUG] 服务器返回的数据:', response)
+      console.log('[DEBUG] image_url:', response.image_url)
+      console.log('[DEBUG] image_urls:', response.image_urls)
 
       ElMessage.success('发布成功！')
       router.push(`/list/${form.category}`)

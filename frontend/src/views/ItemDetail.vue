@@ -32,7 +32,7 @@
                   v-for="(url, index) in imageUrls"
                   :key="index"
                   class="thumbnail-item"
-                  :class="{ active: index === 0 }"
+                  :class="{ active: index === currentMainImageIndex }"
                   @click="switchMainImage(index)"
                 >
                   <el-image
@@ -273,17 +273,9 @@ const previewImageUrls = computed(() => {
   return previewListMultiple(imageUrls.value)
 })
 
-// 切换主图
+// 切换主图（只改变显示的主图，不改变数组顺序）
 const switchMainImage = (index) => {
   currentMainImageIndex.value = index
-  // 重新排列数组，将选中的图片放到第一位
-  if (index > 0 && imageUrls.value.length > 1) {
-    const newUrls = [...imageUrls.value]
-    const selected = newUrls.splice(index, 1)[0]
-    newUrls.unshift(selected)
-    item.value.image_urls = newUrls
-    currentMainImageIndex.value = 0
-  }
 }
 
 // 过滤时间线：只显示"发布"和"物品已找回"，并修改"物品已找回"的描述
@@ -314,6 +306,9 @@ const loadItemDetail = async () => {
   loading.value = true;
   try {
     item.value = await request.get(`/items/${itemId}`);
+    console.log('[DEBUG] 加载的物品数据:', item.value)
+    console.log('[DEBUG] image_url:', item.value.image_url)
+    console.log('[DEBUG] image_urls:', item.value.image_urls)
     timeline.value = await request.get(`/items/${itemId}/timeline`);
   } catch (error) {
     console.error("加载详情失败:", error);
