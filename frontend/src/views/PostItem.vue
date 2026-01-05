@@ -142,7 +142,7 @@
           </div>
           <div class="upload-tip">
             <el-text type="info" size="small">
-              支持 jpg、png、gif 格式，每张大小不超过10MB，最多上传8张，总大小不超过80MB，第一张将作为主图
+              支持 jpg、png、gif 格式，每张原始大小不超过10MB，上传前会自动压缩，最多上传8张，第一张将作为主图
             </el-text>
           </div>
         </el-form-item>
@@ -164,6 +164,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
+import imageCompression from 'browser-image-compression'
 import request from '../utils/request'
 
 const router = useRouter()
@@ -198,7 +199,7 @@ const rules = {
   ]
 }
 
-const handleImageChange = (file, fileList) => {
+const handleImageChange = async (file, fileList) => {
   // 检查是否已达到8张限制
   if (imageList.value.length >= 8) {
     ElMessage.warning('最多只能上传8张图片，请先删除部分图片后再上传')
@@ -206,43 +207,82 @@ const handleImageChange = (file, fileList) => {
   }
 
   const isImage = file.raw.type.startsWith('image/')
-  const fileSizeMB = file.raw.size / 1024 / 1024
-  const isLt10M = fileSizeMB < 10
+  const originalSizeMB = file.raw.size / 1024 / 1024
 
   if (!isImage) {
     ElMessage.error('只能上传图片文件！')
     return false
   }
-  if (!isLt10M) {
+  
+  // 检查原始文件大小（最大 10MB）
+  if (originalSizeMB > 10) {
     ElMessage.error('图片大小不能超过10MB！')
     return false
   }
 
-  // 检查总大小（8张 × 10MB = 80MB）
-  const currentTotalSize = imageList.value.reduce((sum, img) => sum + img.file.size, 0)
-  const newTotalSize = currentTotalSize + file.raw.size
-  const maxTotalSize = 80 * 1024 * 1024 // 80MB
+  try {
+    // 压缩图片
+    const options = {
+      maxSizeMB: 2, // 压缩后最大 2MB
+      maxWidthOrHeight: 1920, // 最大宽度或高度
+      useWebWorker: true, // 使用 Web Worker 提高性能
+      fileType: file.raw.type, // 保持原始格式
+      initialQuality: 0.8 // 初始质量 80%
+    }
 
-  if (newTotalSize > maxTotalSize) {
-    const currentTotalMB = (currentTotalSize / 1024 / 1024).toFixed(2)
-    ElMessage.error(`图片总大小不能超过80MB！当前已上传 ${currentTotalMB}MB，此图片 ${fileSizeMB.toFixed(2)}MB`)
+    // 显示压缩提示
+    const loadingMessage = ElMessage({
+      message: '正在压缩图片...',
+      type: 'info',
+      duration: 0 // 不自动关闭
+    })
+
+    const compressedFile = await imageCompression(file.raw, options)
+    
+    // 关闭加载提示
+    loadingMessage.close()
+
+    const compressedSizeMB = compressedFile.size / 1024 / 1024
+    const compressionRatio = ((1 - compressedFile.size / file.raw.size) * 100).toFixed(1)
+    
+    // 如果压缩效果明显，显示提示
+    if (compressionRatio > 20) {
+      ElMessage.success(`图片已压缩：${originalSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (减少 ${compressionRatio}%)`)
+    }
+
+    // 检查总大小（8张 × 2MB = 16MB，留有余地设为 20MB）
+    const currentTotalSize = imageList.value.reduce((sum, img) => sum + img.file.size, 0)
+    const newTotalSize = currentTotalSize + compressedFile.size
+    const maxTotalSize = 20 * 1024 * 1024 // 20MB（压缩后）
+
+    if (newTotalSize > maxTotalSize) {
+      const currentTotalMB = (currentTotalSize / 1024 / 1024).toFixed(2)
+      ElMessage.error(`图片总大小不能超过20MB（压缩后）！当前已上传 ${currentTotalMB}MB，此图片 ${compressedSizeMB.toFixed(2)}MB`)
+      return false
+    }
+
+    // 创建预览
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      // 再次检查，防止在异步处理过程中超过限制
+      if (imageList.value.length >= 8) {
+        ElMessage.warning('最多只能上传8张图片')
+        return
+      }
+      imageList.value.push({
+        file: compressedFile, // 使用压缩后的文件
+        preview: e.target.result,
+        originalFile: file.raw // 保存原文件引用（如果需要）
+      })
+    }
+    reader.readAsDataURL(compressedFile)
+    
+    return true
+  } catch (error) {
+    console.error('图片压缩失败:', error)
+    ElMessage.error('图片压缩失败，请重试')
     return false
   }
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    // 再次检查，防止在异步处理过程中超过限制
-    if (imageList.value.length >= 8) {
-      ElMessage.warning('最多只能上传8张图片')
-      return
-    }
-    imageList.value.push({
-      file: file.raw,
-      preview: e.target.result
-    })
-  }
-  reader.readAsDataURL(file.raw)
-  return true
 }
 
 const removeImage = (index) => {
