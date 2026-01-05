@@ -453,7 +453,7 @@ lost-found-system/
 
 #### 服务器要求
 - **操作系统**：Linux（推荐 Ubuntu、CentOS 或 Alibaba Cloud Linux）
-- **内存**：建议 2GB 以上
+- **内存**：**至少 4GB**（前端构建需要较大内存，1-2GB 可能导致构建失败）
 - **存储**：建议 20GB 以上
 - **网络**：需要公网 IP
 
@@ -814,6 +814,14 @@ npm install --registry=https://registry.npmmirror.com
 npm run build
 ```
 
+> ⚠️ **重要提示**：
+> - 如果构建过程中显示 `Killed`，说明服务器内存不足
+> - **服务器内存至少需要 4GB** 才能成功构建前端项目
+> - 如果内存不足，可以考虑：
+>   1. 升级服务器配置（推荐）
+>   2. 在本地构建后上传 `dist` 目录到服务器
+>   3. 创建 Swap 交换空间（临时方案）
+
 构建完成后，会在 `frontend/dist` 目录生成静态文件。
 
 **验证构建结果**：
@@ -821,7 +829,7 @@ npm run build
 ls -la dist/
 ```
 
-应该能看到 `index.html` 等文件。
+应该能看到 `index.html` 和 `assets/` 目录。如果只有 `favicon.png`，说明构建未完成。
 
 ---
 
@@ -1108,6 +1116,33 @@ cp /root/campus-lost-found/backend/lost_found.db /root/lost_found_backup_$(date 
 ---
 
 ## ❓ 常见问题
+
+### 部署问题
+
+**Q: 前端构建时显示 "Killed" 或被中断？**
+
+A: 这是内存不足导致的。解决方案：
+1. **升级服务器配置**（推荐）：将内存升级到至少 4GB
+2. **在本地构建后上传**：
+   ```bash
+   # 在本地构建
+   cd frontend
+   npm run build
+   # 打包 dist 目录
+   # Windows: Compress-Archive -Path dist -DestinationPath dist.zip
+   # 上传到服务器后解压
+   ```
+3. **创建 Swap 交换空间**（临时方案）：
+   ```bash
+   sudo fallocate -l 2G /swapfile
+   sudo chmod 600 /swapfile
+   sudo mkswap /swapfile
+   sudo swapon /swapfile
+   ```
+
+**Q: 构建后 dist 目录只有 favicon.png，没有 index.html？**
+
+A: 构建未完成，通常是内存不足。请参考上面的解决方案。
 
 ### 安装问题
 
