@@ -445,6 +445,13 @@ const openEdit = async (item) => {
         let filename = url
         if (url.startsWith('/api/image/')) {
           filename = url.replace('/api/image/', '')
+          // URL 解码，处理可能的编码字符
+          try {
+            filename = decodeURIComponent(filename)
+          } catch (e) {
+            // 如果解码失败，使用原始文件名
+            console.warn('文件名解码失败:', filename, e)
+          }
         }
         return {
           id: `existing_${index}_${filename}`, // 使用文件名确保唯一性
@@ -460,6 +467,13 @@ const openEdit = async (item) => {
       let filename = fullItem.image_url
       if (filename.startsWith('/api/image/')) {
         filename = filename.replace('/api/image/', '')
+        // URL 解码，处理可能的编码字符
+        try {
+          filename = decodeURIComponent(filename)
+        } catch (e) {
+          // 如果解码失败，使用原始文件名
+          console.warn('文件名解码失败:', filename, e)
+        }
       }
       editImageList.value = [{
         id: `existing_0_${filename}`,
@@ -499,6 +513,13 @@ const submitEdit = async () => {
           imagePath = img.originalUrl || img.url
           if (imagePath.startsWith('/api/image/')) {
             imagePath = imagePath.replace('/api/image/', '')
+            // URL 解码，处理可能的编码字符
+            try {
+              imagePath = decodeURIComponent(imagePath)
+            } catch (e) {
+              // 如果解码失败，使用原始路径
+              console.warn('文件名解码失败:', imagePath, e)
+            }
           }
         }
         if (imagePath) {

@@ -1163,7 +1163,20 @@ def update_item_images(item_id):
         file = request.files['image']
         if file and hasattr(file, 'filename') and file.filename:
             original_filename = file.filename
-            if original_filename.lower() != 'blob' and allowed_file(original_filename):
+            # 处理 "blob" 文件名
+            if original_filename.lower() == 'blob' or not original_filename:
+                content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+                ext_map = {
+                    'image/jpeg': 'jpg',
+                    'image/jpg': 'jpg',
+                    'image/png': 'png',
+                    'image/gif': 'gif',
+                    'image/webp': 'webp',
+                    'image/bmp': 'bmp'
+                }
+                ext = ext_map.get(content_type, 'jpg')
+                original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+            if allowed_file(original_filename):
                 if not file_too_large(file):
                     import random
                     timestamp = datetime.now().timestamp()
@@ -1180,7 +1193,20 @@ def update_item_images(item_id):
         for file in files:
             if file and hasattr(file, 'filename') and file.filename:
                 original_filename = file.filename
-                if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                # 处理 "blob" 文件名
+                if original_filename.lower() == 'blob' or not original_filename:
+                    content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+                    ext_map = {
+                        'image/jpeg': 'jpg',
+                        'image/jpg': 'jpg',
+                        'image/png': 'png',
+                        'image/gif': 'gif',
+                        'image/webp': 'webp',
+                        'image/bmp': 'bmp'
+                    }
+                    ext = ext_map.get(content_type, 'jpg')
+                    original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+                if allowed_file(original_filename):
                     if not file_too_large(file):
                         import random
                         timestamp = datetime.now().timestamp()
@@ -1203,6 +1229,14 @@ def update_item_images(item_id):
                 filename = existing_path.replace('/api/image/', '')
             else:
                 filename = existing_path
+            # URL 解码，处理可能的编码字符
+            try:
+                from urllib.parse import unquote
+                filename = unquote(filename)
+            except:
+                pass
+            # 清理文件名：只取文件名部分，去除路径
+            filename = os.path.basename(filename)
             # 验证文件是否存在
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             if os.path.exists(filepath):
@@ -1304,6 +1338,12 @@ def get_image(filename):
     try:
         # 安全检查：防止路径遍历攻击
         original_filename = filename
+        # URL 解码，处理可能的编码字符
+        try:
+            from urllib.parse import unquote
+            filename = unquote(filename)
+        except:
+            pass
         filename = os.path.basename(filename)  # 只取文件名部分，去除路径
         
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
