@@ -453,6 +453,10 @@ const openEdit = async (item) => {
             console.warn('文件名解码失败:', filename, e)
           }
         }
+        // 清理文件名：只取文件名部分，去除可能的路径
+        if (filename.includes('/')) {
+          filename = filename.split('/').pop()
+        }
         return {
           id: `existing_${index}_${filename}`, // 使用文件名确保唯一性
           url: url,
@@ -474,6 +478,10 @@ const openEdit = async (item) => {
           // 如果解码失败，使用原始文件名
           console.warn('文件名解码失败:', filename, e)
         }
+      }
+      // 清理文件名：只取文件名部分，去除可能的路径
+      if (filename.includes('/')) {
+        filename = filename.split('/').pop()
       }
       editImageList.value = [{
         id: `existing_0_${filename}`,
@@ -521,6 +529,10 @@ const submitEdit = async () => {
               console.warn('文件名解码失败:', imagePath, e)
             }
           }
+        }
+        // 清理文件名：只取文件名部分，去除可能的路径
+        if (imagePath && imagePath.includes('/')) {
+          imagePath = imagePath.split('/').pop()
         }
         if (imagePath) {
           formData.append('keep_existing', imagePath)

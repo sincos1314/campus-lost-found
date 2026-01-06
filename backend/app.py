@@ -52,11 +52,15 @@ def unsupported_media_type(error):
 # 添加请求前的钩子来记录所有请求
 @app.before_request
 def log_request_info():
-    if request.method in ['POST', 'PUT'] and '/api/reports/' in request.path:
+    if request.method in ['POST', 'PUT'] and ('/api/reports/' in request.path or '/api/items/' in request.path):
         print(f'[BEFORE_REQUEST] Method: {request.method}')
         print(f'[BEFORE_REQUEST] Path: {request.path}')
         print(f'[BEFORE_REQUEST] Content-Type: {request.content_type}')
         print(f'[BEFORE_REQUEST] Headers: {dict(request.headers)}')
+        if '/api/items/' in request.path and '/images' in request.path:
+            print(f'[BEFORE_REQUEST] Items images request detected')
+            print(f'[BEFORE_REQUEST] Form keys: {list(request.form.keys())}')
+            print(f'[BEFORE_REQUEST] Files keys: {list(request.files.keys())}')
 
 # 数据模型
 class User(db.Model):
@@ -1143,6 +1147,11 @@ def update_item_image(item_id):
 @jwt_required()
 def update_item_images(item_id):
     """更新物品的多张图片（支持保留已存在的图片和上传新图片，按顺序更新）"""
+    print(f'[DEBUG] 收到更新图片请求: item_id={item_id}, method={request.method}')
+    print(f'[DEBUG] Content-Type: {request.content_type}')
+    print(f'[DEBUG] Form data keys: {list(request.form.keys())}')
+    print(f'[DEBUG] Files keys: {list(request.files.keys())}')
+    
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if getattr(user, 'is_banned', False):
@@ -1239,8 +1248,11 @@ def update_item_images(item_id):
             filename = os.path.basename(filename)
             # 验证文件是否存在
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            if os.path.exists(filepath):
+            if os.path.exists(filepath) and os.path.isfile(filepath):
                 final_image_paths.append(filename)
+            else:
+                print(f'[WARNING] 要保留的图片文件不存在，跳过: {filename}')
+                print(f'[WARNING] 文件路径: {filepath}')
     
     # 添加新上传的图片
     final_image_paths.extend(image_paths)
