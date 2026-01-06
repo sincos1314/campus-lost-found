@@ -1147,12 +1147,19 @@ def update_item_image(item_id):
 @jwt_required()
 def update_item_images(item_id):
     """更新物品的多张图片（支持保留已存在的图片和上传新图片，按顺序更新）"""
-    print(f'[DEBUG] 收到更新图片请求: item_id={item_id}, method={request.method}')
+    print(f'[DEBUG] ========== 收到更新图片请求 ==========')
+    print(f'[DEBUG] item_id={item_id}, method={request.method}')
     print(f'[DEBUG] Content-Type: {request.content_type}')
+    print(f'[DEBUG] URL: {request.url}')
+    print(f'[DEBUG] Path: {request.path}')
     print(f'[DEBUG] Form data keys: {list(request.form.keys())}')
     print(f'[DEBUG] Files keys: {list(request.files.keys())}')
     
-    user_id = int(get_jwt_identity())
+    try:
+        user_id = int(get_jwt_identity())
+    except Exception as e:
+        print(f'[ERROR] JWT 验证失败: {e}')
+        raise
     user = User.query.get(user_id)
     if getattr(user, 'is_banned', False):
         return jsonify({'message': '账户已被封禁，无法修改'}), 403
@@ -1297,6 +1304,12 @@ def update_item_images(item_id):
     print(f'[DEBUG] 返回的 image_urls: {item_dict.get("image_urls")}')
     
     return jsonify(item_dict)
+
+# 添加一个测试路由来验证路由注册
+@app.route('/api/test/items-images', methods=['GET', 'POST'])
+def test_items_images_route():
+    """测试路由是否注册"""
+    return jsonify({'message': '路由已注册', 'path': request.path, 'method': request.method}), 200
 
 @app.route('/api/items/<int:item_id>/image', methods=['DELETE'])
 @jwt_required()
