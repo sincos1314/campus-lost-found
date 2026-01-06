@@ -16,6 +16,7 @@
           @change="load"
         >
           <el-option label="全部" value="" />
+          <el-option label="已举报" value="open" />
           <el-option label="处理中" value="processing" />
           <el-option label="已解决" value="resolved" />
           <el-option label="已拒绝" value="rejected" />
@@ -191,78 +192,118 @@
           </div>
         </el-tab-pane>
         <el-tab-pane label="举报" name="reports" v-if="isAdmin">
-          <el-table :data="reportsPaged" style="width: 100%">
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column label="举报类别">
+          <el-table :data="reportsPaged" style="width: 100%" class="reports-table">
+            <el-table-column prop="id" label="ID" width="80" class-name="report-cell" />
+            <el-table-column label="举报类别" min-width="100" class-name="report-cell">
               <template #default="{ row }">{{
                 reportCategoryText(row.category)
               }}</template>
             </el-table-column>
-            <el-table-column label="严重级">
+            <el-table-column label="严重级" min-width="80" class-name="report-cell">
               <template #default="{ row }">{{
                 severityText(row.severity)
               }}</template>
             </el-table-column>
-            <el-table-column label="状态">
-              <template #default="{ row }">{{
-                statusReportText(row.status, row.user_withdrawn)
-              }}</template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明" />
-            <el-table-column label="被举报物品" width="220">
+            <el-table-column label="状态" width="195" class-name="report-cell">
               <template #default="{ row }">
-                <el-button
+                <el-select
+                  :model-value="row.status"
+                  @update:model-value="handleStatusChange(row, $event)"
+                  placeholder="设置状态"
+                  :disabled="row.user_withdrawn || row.status === 'withdrawn'"
+                  style="width: 100%"
+                >
+                  <!-- 当状态是 open 时，添加"已举报"选项用于显示（disabled，不可选） -->
+                  <el-option 
+                    v-if="row.status === 'open' && !row.user_withdrawn"
+                    label="已举报" 
+                    value="open"
+                    disabled
+                  />
+                  <!-- 当状态是 withdrawn 时，添加"举报已撤回"选项用于显示（disabled，不可选） -->
+                  <el-option 
+                    v-if="row.user_withdrawn || row.status === 'withdrawn'"
+                    label="举报已撤回" 
+                    value="withdrawn"
+                    disabled
+                  />
+                  <!-- 可选择的选项 -->
+                  <el-option label="处理中" value="processing" />
+                  <el-option label="已解决" value="resolved" />
+                  <el-option label="已拒绝" value="rejected" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column prop="description" label="说明" min-width="150" class-name="report-cell" show-overflow-tooltip />
+            <el-table-column label="被举报物品" min-width="180" class-name="report-cell">
+              <template #default="{ row }">
+                <a
                   v-if="row.item_id"
-                  type="text"
                   @click="gotoItem(row)"
+                  class="report-item-link"
                 >
                   {{ row.item_title || "物品#" + row.item_id }}（{{
                     categoryText(row.item_category)
                   }}）
-                </el-button>
+                </a>
                 <span v-else>无</span>
               </template>
             </el-table-column>
-            <el-table-column label="举报用户" width="200">
+            <el-table-column label="举报用户" min-width="150" class-name="report-cell">
               <template #default="{ row }">
                 <span v-if="row.anonymous">此用户为匿名举报</span>
                 <span v-else>{{ row.reporter_username || ('用户#'+row.reporter_id) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="被举报用户" width="200">
+            <el-table-column label="被举报用户" min-width="150" class-name="report-cell">
               <template #default="{ row }">
                 <span>{{ row.target_username || (row.target_user_id ? ('用户#'+row.target_user_id) : '无') }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="证据" width="120">
+            <el-table-column label="证据" width="180" class-name="report-cell">
               <template #default="{ row }">
-                <el-image
-                  v-if="row.evidence_image_url"
-                  :src="absoluteUrl(row.evidence_image_url)"
-                  :preview-src-list="[ absoluteUrl(row.evidence_image_url) ]"
-                  style="width: 60px; height: 60px"
-                />
+                <div v-if="getEvidenceImages(row).length > 0" class="evidence-image-container">
+                  <el-image
+                    :src="absoluteUrl(getCurrentEvidenceImage(row))"
+                    :preview-src-list="getEvidencePreviewList(row)"
+                    style="width: 60px; height: 60px; z-index: 3000"
+                    :preview-teleported="true"
+                  />
+                  <div v-if="getEvidenceImages(row).length > 1" class="evidence-controls">
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="getCurrentEvidenceIndex(row) === 0"
+                      @click.stop="prevEvidenceImage(row)"
+                      class="evidence-nav-btn"
+                    >
+                      &lt;
+                    </el-button>
+                    <span class="evidence-counter">
+                      {{ getCurrentEvidenceIndex(row) + 1 }}/{{ getEvidenceImages(row).length }}
+                    </span>
+                    <el-button
+                      size="small"
+                      circle
+                      :disabled="getCurrentEvidenceIndex(row) === getEvidenceImages(row).length - 1"
+                      @click.stop="nextEvidenceImage(row)"
+                      class="evidence-nav-btn"
+                    >
+                      &gt;
+                    </el-button>
+                  </div>
+                </div>
                 <span v-else>无</span>
               </template>
             </el-table-column>
-            <el-table-column label="处理" width="360">
+            <el-table-column label="处理" min-width="400" class-name="report-cell">
               <template #default="{ row }">
-                <el-select
-                  v-model="row.status"
-                  placeholder="设置状态"
-                  @change="updateReportStatus(row)"
-                  :disabled="row.user_withdrawn"
-                >
-                  <el-option label="处理中" value="processing" />
-                  <el-option label="已解决" value="resolved" />
-                  <el-option label="已拒绝" value="rejected" />
-                  <el-option label="举报已撤回" value="withdrawn" disabled />
-                </el-select>
                 <el-input
                   v-model="row.resolution_note"
                   placeholder="处理备注"
-                  @change="updateReportStatus(row)"
-                  style="margin-top: 6px; width: 100%"
+                  @change="updateReportStatus(row, row.status)"
+                  :disabled="row.user_withdrawn || row.status === 'withdrawn'"
+                  style="width: 100%"
                 />
                 <div
                   style="
@@ -460,18 +501,34 @@
         <el-form-item label="标题"
           ><el-input v-model="newItem.title"
         /></el-form-item>
-        <el-form-item label="描述"
-          ><el-input v-model="newItem.description" type="textarea"
-        /></el-form-item>
+        <el-form-item label="描述">
+          <el-input
+            v-model="newItem.description"
+            type="textarea"
+            :rows="5"
+            placeholder="详细描述物品特征、品牌、颜色等信息，便于识别"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="newItem.category">
             <el-option label="失物" value="lost" />
             <el-option label="拾物" value="found" />
           </el-select>
         </el-form-item>
-        <el-form-item label="物品类型"
-          ><el-input v-model="newItem.item_type"
-        /></el-form-item>
+        <el-form-item label="物品类型">
+          <el-select v-model="newItem.item_type" placeholder="请选择物品类型">
+            <el-option label="手机" value="手机" />
+            <el-option label="钱包" value="钱包" />
+            <el-option label="钥匙" value="钥匙" />
+            <el-option label="身份证/学生证" value="身份证/学生证" />
+            <el-option label="书籍" value="书籍" />
+            <el-option label="衣物" value="衣物" />
+            <el-option label="电子产品" value="电子产品" />
+            <el-option label="其他" value="其他" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="地点"
           ><el-input v-model="newItem.location"
         /></el-form-item>
@@ -497,8 +554,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from "vue";
-import request, { absoluteUrl, previewList } from "../utils/request";
+import { ref, onMounted, watch, computed, nextTick } from "vue";
+import request, { absoluteUrl, previewList, previewListMultiple } from "../utils/request";
 import { getUser } from "../utils/auth";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -519,6 +576,8 @@ const pageSize = ref(10);
 const usersPage = ref(1);
 const itemsPage = ref(1);
 const reportsPage = ref(1);
+// 存储每个举报的当前证据图片索引
+const evidenceImageIndices = ref({});
 const me = getUser();
 const isAdmin = computed(() => me?.role === 'admin');
 const meLevel = me?.admin_level || "";
@@ -561,6 +620,58 @@ const statText = (k) =>
     closed: "已解决数量",
     reports_open: "未处理举报",
   }[k] || k);
+
+// 获取举报的所有证据图片
+const getEvidenceImages = (row) => {
+  if (row.evidence_image_urls && Array.isArray(row.evidence_image_urls) && row.evidence_image_urls.length > 0) {
+    return row.evidence_image_urls;
+  } else if (row.evidence_image_url) {
+    return [row.evidence_image_url];
+  }
+  return [];
+};
+
+// 获取当前显示的证据图片
+const getCurrentEvidenceImage = (row) => {
+  const images = getEvidenceImages(row);
+  if (images.length === 0) return '';
+  const index = getCurrentEvidenceIndex(row);
+  return images[index] || images[0];
+};
+
+// 获取当前证据图片索引
+const getCurrentEvidenceIndex = (row) => {
+  if (!evidenceImageIndices.value[row.id]) {
+    evidenceImageIndices.value[row.id] = 0;
+  }
+  return evidenceImageIndices.value[row.id];
+};
+
+// 获取证据图片预览列表
+const getEvidencePreviewList = (row) => {
+  const images = getEvidenceImages(row);
+  return previewListMultiple(images);
+};
+
+// 上一张证据图片
+const prevEvidenceImage = (row) => {
+  const images = getEvidenceImages(row);
+  if (images.length <= 1) return;
+  const currentIndex = getCurrentEvidenceIndex(row);
+  if (currentIndex > 0) {
+    evidenceImageIndices.value[row.id] = currentIndex - 1;
+  }
+};
+
+// 下一张证据图片
+const nextEvidenceImage = (row) => {
+  const images = getEvidenceImages(row);
+  if (images.length <= 1) return;
+  const currentIndex = getCurrentEvidenceIndex(row);
+  if (currentIndex < images.length - 1) {
+    evidenceImageIndices.value[row.id] = currentIndex + 1;
+  }
+};
 
 // 普通用户只能看到部分统计信息
 const filteredStats = computed(() => {
@@ -634,11 +745,28 @@ const updateItemStatus = async (row, status) => {
   await request.put(`/admin/items/${row.id}/status`, { status });
   await load();
 };
-const updateReportStatus = async (row) => {
-  await request.put(`/admin/reports/${row.id}`, {
-    status: row.status,
-    resolution_note: row.resolution_note,
-  });
+const updateReportStatus = async (row, status = null) => {
+  // 使用传入的 status 参数，如果没有则使用 row.status
+  const targetStatus = status !== null ? status : row.status;
+  
+  // 如果状态是 open 或 withdrawn，不允许更新（这些是显示用的）
+  if (targetStatus === 'open' || targetStatus === 'withdrawn' || row.user_withdrawn) {
+    return;
+  }
+  try {
+    await request.put(`/admin/reports/${row.id}`, {
+      status: targetStatus,
+      resolution_note: row.resolution_note,
+    });
+    ElMessage.success('状态已更新');
+  } catch (error) {
+    console.error('更新状态失败:', error);
+    ElMessage.error('更新状态失败');
+    // 重新加载数据以恢复原状态
+    if (tab.value === 'reports') {
+      await load();
+    }
+  }
 };
 const adminDeleteReportedItem = async (row) => {
   await request.delete(`/admin/items/${row.item_id}`);
@@ -666,16 +794,30 @@ const reportCategoryText = (c) =>
     c
   ] || c);
 const severityText = (s) => ({ low: "低", medium: "中", high: "高" }[s] || s);
+// 注意：statusReportText 函数可能在其他地方使用，暂时保留
 const statusReportText = (st, withdrawn) => {
   if (withdrawn || st === "withdrawn") return "举报已撤回";
   return (
     {
-      open: "已发布",
+      open: "已举报",
       processing: "处理中",
       resolved: "已解决",
       rejected: "已拒绝",
     }[st] || st
   );
+};
+
+
+// 处理状态下拉框的值变化
+const handleStatusChange = async (row, newValue) => {
+  // 如果选择的是 open 或 withdrawn，不允许（这些是显示用的，不可选）
+  if (newValue === 'open' || newValue === 'withdrawn') {
+    // 不更新状态，保持原值
+    return;
+  }
+  // 更新状态
+  row.status = newValue;
+  await updateReportStatus(row, newValue);
 };
 const appoint = async (row, level) => {
   await request.post("/admin/appoint", { target_user_id: row.id, level });
@@ -752,7 +894,7 @@ const submitCreateItem = async () => {
     title: "",
     description: "",
     category: "lost",
-    item_type: "",
+    item_type: "手机",
     location: "",
     contact_name: "",
     contact_phone: "",
@@ -925,6 +1067,255 @@ const viewItem = (row) => {
   box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
+/* 证据图片容器样式 */
+.evidence-image-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.evidence-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.evidence-nav-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 50%;
+  background: var(--color-card);
+  color: var(--color-text);
+  transition: all 0.15s ease;
+}
+
+.evidence-nav-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.evidence-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.evidence-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  min-width: 40px;
+  text-align: center;
+}
+
+/* 确保图片预览不被遮挡 */
+.admin-container :deep(.el-image-viewer__wrapper) {
+  z-index: 9999 !important;
+}
+
+.admin-container :deep(.el-image-viewer__mask) {
+  z-index: 9998 !important;
+}
+
+/* 状态显示文本样式 */
+.status-display-text {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-primary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  min-width: 80px;
+  text-align: center;
+}
+
+.status-display-text.withdrawn-status {
+  color: #f56565;
+  background: rgba(245, 101, 101, 0.1);
+}
+
+/* 状态下拉框样式 */
+.admin-container :deep(.el-table .el-select) {
+  width: 100%;
+}
+
+.admin-container :deep(.el-table .el-select.is-disabled .el-input__inner) {
+  color: var(--color-text);
+  cursor: not-allowed;
+}
+
+/* 禁用选项的样式（用于显示"已举报"和"举报已撤回"） */
+.admin-container :deep(.el-table .el-select .el-option.is-disabled) {
+  color: var(--color-text);
+  cursor: default;
+}
+
+.admin-container :deep(.el-table .el-select .el-option.is-disabled.selected) {
+  color: var(--color-text);
+  background-color: var(--color-primary);
+}
+
+/* 举报表格样式优化 */
+.admin-container :deep(.reports-table) {
+  table-layout: auto;
+}
+
+.admin-container :deep(.reports-table .report-cell) {
+  padding: 12px 16px !important;
+  word-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+  line-height: 1.6;
+  vertical-align: top;
+}
+
+/* 状态列特殊处理 - 减少padding以给下拉框更多空间 */
+.admin-container :deep(.reports-table .el-table__cell[data-label="状态"]) {
+  padding: 12px 8px !important;
+}
+
+.admin-container :deep(.reports-table .el-table__cell) {
+  padding: 12px 16px !important;
+}
+
+.admin-container :deep(.reports-table .el-table__header .el-table__cell) {
+  padding: 12px 16px !important;
+  font-weight: 700;
+  background: var(--color-primary);
+  color: var(--color-text);
+}
+
+/* 举报表格中的链接样式 */
+.admin-container :deep(.reports-table .report-item-link) {
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: normal;
+  word-wrap: break-word;
+  word-break: break-all;
+  text-align: left;
+  line-height: 1.6;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+.admin-container :deep(.reports-table .report-item-link:hover) {
+  color: var(--color-accent);
+  text-decoration: underline;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* 处理字段中的按钮容器 */
+.admin-container :deep(.reports-table .el-table__cell > div[style*="margin-top"]) {
+  margin-top: 8px !important;
+  gap: 8px !important;
+}
+
+/* 确保表格单元格内容可以换行 */
+.admin-container :deep(.reports-table td) {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+}
+
+/* 处理备注输入框样式 */
+.admin-container :deep(.reports-table .el-input) {
+  width: 100%;
+}
+
+.admin-container :deep(.reports-table .el-input__wrapper) {
+  width: 100%;
+}
+
+/* 状态下拉框样式 - 确保内容完整显示 */
+.admin-container :deep(.reports-table .el-select) {
+  width: 100% !important;
+  min-width: 150px;
+}
+
+.admin-container :deep(.reports-table .el-select__wrapper) {
+  width: 100% !important;
+  min-width: 150px;
+}
+
+.admin-container :deep(.reports-table .el-select__selected-item) {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+  width: auto !important;
+  display: inline-block !important;
+  padding-right: 20px !important;
+}
+
+.admin-container :deep(.reports-table .el-select .el-input__inner) {
+  width: 100% !important;
+  min-width: 150px;
+  padding-right: 30px !important;
+}
+
+.admin-container :deep(.reports-table .el-select__placeholder) {
+  white-space: nowrap;
+}
+
+/* 确保状态下拉框单元格有足够空间 */
+.admin-container :deep(.reports-table .el-table__cell[data-label="状态"]) {
+  min-width: 160px !important;
+  width: 160px !important;
+  padding: 12px 8px !important;
+}
+
+/* 确保下拉框在单元格内完整显示 */
+.admin-container :deep(.reports-table .el-table__cell[data-label="状态"] .el-select) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 优化表格行间距和整体布局 */
+.admin-container :deep(.reports-table .el-table__row) {
+  height: auto;
+  min-height: 60px;
+}
+
+.admin-container :deep(.reports-table .el-table__body tr:hover > td) {
+  background-color: var(--color-primary);
+  opacity: 0.8;
+}
+
+/* 确保表格列宽自适应 */
+.admin-container :deep(.reports-table .el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 优化说明字段的显示 */
+.admin-container :deep(.reports-table .el-table__cell[data-label="说明"]) {
+  max-width: 200px;
+}
+
+/* 优化按钮组布局 */
+.admin-container :deep(.reports-table .el-table__cell > div[style*="display: flex"]) {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.admin-container :deep(.reports-table .el-button--small) {
+  margin: 2px;
+  white-space: nowrap;
+}
+
 .admin-container :deep(.el-table) {
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--border-radius);
@@ -946,8 +1337,8 @@ const viewItem = (row) => {
 
 .admin-container :deep(.el-dialog .el-input),
 .admin-container :deep(.el-dialog .el-select),
-.admin-container :deep(.el-dialog .el-date-editor),
-.admin-container :deep(.el-dialog .el-textarea) {
+.admin-container :deep(.el-dialog .el-textarea),
+.admin-container :deep(.el-dialog .el-date-editor) {
   border: none !important;
   box-shadow: none !important;
 }
@@ -963,7 +1354,17 @@ const viewItem = (row) => {
 }
 
 .admin-container :deep(.el-dialog .el-input__inner),
-.admin-container :deep(.el-dialog .el-textarea__inner),
+.admin-container :deep(.el-dialog .el-textarea__inner) {
+  /* textarea 的 inner 需要保持边框 */
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--border-radius) !important;
+  background: var(--color-card) !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  padding: 0.6rem 1rem !important;
+}
+
 .admin-container :deep(.el-dialog .el-select__placeholder),
 .admin-container :deep(.el-dialog .el-select__selected-item) {
   border: none !important;
@@ -976,6 +1377,12 @@ const viewItem = (row) => {
 .admin-container :deep(.el-dialog .el-input__wrapper.is-focus),
 .admin-container :deep(.el-dialog .el-textarea__inner:focus),
 .admin-container :deep(.el-dialog .el-select__wrapper.is-focused) {
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 确保 textarea 的 focus 状态也有阴影效果 */
+.admin-container :deep(.el-dialog .el-textarea__inner:focus) {
   box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
   border-color: var(--border-color) !important;
 }

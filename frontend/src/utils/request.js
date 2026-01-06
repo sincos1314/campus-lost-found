@@ -33,6 +33,19 @@ request.interceptors.request.use(
       // 确保 Authorization header 格式正确
       config.headers.Authorization = `Bearer ${token}`
     }
+    // 如果是 FormData，让浏览器自动设置 Content-Type（包括 boundary）
+    if (config.data instanceof FormData) {
+      // 删除手动设置的 Content-Type，让浏览器自动设置
+      // 使用 Object.keys 和 delete 确保完全删除
+      Object.keys(config.headers).forEach(key => {
+        if (key.toLowerCase() === 'content-type') {
+          delete config.headers[key]
+        }
+      })
+      // 确保 axios 不会自动设置错误的 Content-Type
+      delete config.headers['Content-Type']
+      delete config.headers['content-type']
+    }
     return config
   },
   error => {

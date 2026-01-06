@@ -135,7 +135,7 @@ import {
   Picture,
   MoreFilled,
 } from "@element-plus/icons-vue";
-import request from "../utils/request";
+import request, { apiOrigin, absoluteUrl } from "../utils/request";
 import { getToken } from "../utils/auth";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { io } from "socket.io-client";

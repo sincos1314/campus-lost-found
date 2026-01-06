@@ -26,6 +26,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'lo
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+# 允许 JWT 从查询参数或 header 中获取，避免在 multipart/form-data 请求中解析 body
+app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string']
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024
 
@@ -34,6 +36,27 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+
+# 添加错误处理器来捕获 415 错误和其他错误
+@app.errorhandler(415)
+def unsupported_media_type(error):
+    print(f'[ERROR] 415 Unsupported Media Type')
+    print(f'[ERROR] Content-Type: {request.content_type}')
+    print(f'[ERROR] Method: {request.method}')
+    print(f'[ERROR] URL: {request.url}')
+    print(f'[ERROR] Headers: {dict(request.headers)}')
+    print(f'[ERROR] Has form: {request.form is not None}')
+    print(f'[ERROR] Has files: {len(request.files) > 0}')
+    return jsonify({'message': f'Unsupported media type: {request.content_type}'}), 415
+
+# 添加请求前的钩子来记录所有请求
+@app.before_request
+def log_request_info():
+    if request.method in ['POST', 'PUT'] and '/api/reports/' in request.path:
+        print(f'[BEFORE_REQUEST] Method: {request.method}')
+        print(f'[BEFORE_REQUEST] Path: {request.path}')
+        print(f'[BEFORE_REQUEST] Content-Type: {request.content_type}')
+        print(f'[BEFORE_REQUEST] Headers: {dict(request.headers)}')
 
 # 数据模型
 class User(db.Model):
@@ -302,7 +325,8 @@ class Report(db.Model):
     category = db.Column(db.String(20), nullable=False)
     description = db.Column(db.Text, nullable=False)
     severity = db.Column(db.String(10), default='medium')
-    evidence_image_path = db.Column(db.String(200))
+    evidence_image_path = db.Column(db.String(200))  # 主图（向后兼容）
+    evidence_images_path = db.Column(db.Text)  # 多张证据图片路径（JSON格式）
     resolution_note = db.Column(db.Text)
     status = db.Column(db.String(20), default='open')
     user_withdrawn = db.Column(db.Boolean, default=False)
@@ -353,6 +377,7 @@ with app.app_context():
         for coldef in [
             ('severity', 'TEXT'),
             ('evidence_image_path', 'TEXT'),
+            ('evidence_images_path', 'TEXT'),  # 多张证据图片
             ('resolution_note', 'TEXT'),
             ('user_withdrawn', 'INTEGER'),
             ('anonymous', 'INTEGER')
@@ -597,18 +622,47 @@ def update_privacy_rules():
 @jwt_required()
 def create_report():
     user_id = int(get_jwt_identity())
-    evidence_path = None
+    
+    # 处理多张证据图片
+    evidence_paths = []
+    
+    # 处理主图（image）
     if 'image' in request.files:
         file = request.files['image']
-        if file_too_large(file):
-            return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
-        if file and allowed_file(file.filename):
-            filename = secure_filename(f"evidence_{datetime.now().timestamp()}_{file.filename}")
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            evidence_path = filename
+        if file and hasattr(file, 'filename') and file.filename:
+            original_filename = file.filename
+            if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                if not file_too_large(file):
+                    import random
+                    timestamp = datetime.now().timestamp()
+                    random_suffix = random.randint(1000, 9999)
+                    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                    filename = secure_filename(f"evidence_{timestamp}_{random_suffix}.{ext}")
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    evidence_paths.append(filename)
+    
+    # 处理副图（images）
+    if 'images' in request.files:
+        files = request.files.getlist('images')
+        for file in files:
+            if file and hasattr(file, 'filename') and file.filename:
+                original_filename = file.filename
+                if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                    if not file_too_large(file):
+                        import random
+                        timestamp = datetime.now().timestamp()
+                        random_suffix = random.randint(1000, 9999)
+                        ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                        filename = secure_filename(f"evidence_{timestamp}_{random_suffix}.{ext}")
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        evidence_paths.append(filename)
+    
+    evidence_path = evidence_paths[0] if evidence_paths else None
+    evidence_images_path_json = json.dumps(evidence_paths) if evidence_paths else None
 
-    data = request.form.to_dict() if evidence_path is not None else (request.json or {})
+    data = request.form.to_dict() if evidence_paths else (request.json or {})
 
     existing = Report.query.filter_by(
         reporter_id=user_id,
@@ -625,7 +679,8 @@ def create_report():
         category=(data.get('category') or 'other'),
         description=(data.get('description') or ''),
         severity=(data.get('severity') or 'medium'),
-        evidence_image_path=evidence_path,
+        evidence_image_path=evidence_path,  # 向后兼容
+        evidence_images_path=evidence_images_path_json,  # 多张图片
         anonymous=bool(str(data.get('anonymous', 'false')).lower() in ['true','1','yes'])
     )
     db.session.add(report)
@@ -1020,37 +1075,33 @@ def update_item_image(item_id):
         return jsonify({'message': '不支持的图片格式'}), 400
     
     # 生成新的文件名（确保唯一性）
+    # 使用时间戳 + 随机数，避免文件名冲突和复杂解析
+    import random
     timestamp = datetime.now().timestamp()
-    # 提取文件扩展名
-    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+    random_suffix = random.randint(1000, 9999)
     
-    # 清理文件名：去除可能已存在的时间戳和特殊字符
-    # 如果文件名包含 _compressed，提取基础名称
-    if '_compressed.' in original_filename:
-        # 例如：image_1767607666.480782_compressed.jpg -> image.jpg
-        base_parts = original_filename.split('_compressed.')[0]
-        # 去除时间戳部分（如果存在）
-        if base_parts.count('_') > 0:
-            # 尝试提取最后一个有意义的部分
-            parts = base_parts.split('_')
-            # 如果最后一部分看起来像时间戳（纯数字），忽略它
-            if len(parts) > 1 and parts[-1].replace('.', '').isdigit():
-                base_name = '_'.join(parts[:-1]) if len(parts) > 2 else 'image'
-            else:
-                base_name = base_parts
-        else:
-            base_name = base_parts
-        filename = secure_filename(f"{timestamp}_{base_name}.{ext}")
+    # 提取文件扩展名（从原始文件名或内容类型）
+    if '.' in original_filename:
+        ext = original_filename.rsplit('.', 1)[-1].lower()
+        # 确保扩展名是允许的格式
+        if ext not in ALLOWED_EXTENSIONS:
+            ext = 'jpg'
     else:
-        # 去除可能已存在的时间戳前缀（格式：数字_文件名）
-        # 检查是否以数字开头（可能是时间戳）
-        parts = original_filename.split('_', 1)
-        if len(parts) == 2 and parts[0].replace('.', '').isdigit():
-            # 去除时间戳前缀
-            clean_name = parts[1]
-        else:
-            clean_name = original_filename
-        filename = secure_filename(f"{timestamp}_{clean_name}")
+        # 如果没有扩展名，根据内容类型判断
+        content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+        ext_map = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+            'image/bmp': 'bmp'
+        }
+        ext = ext_map.get(content_type, 'jpg')
+    
+    # 生成简洁的文件名：时间戳_随机数.扩展名
+    filename = secure_filename(f"{timestamp}_{random_suffix}.{ext}")
+    print(f'[DEBUG] 生成的文件名: {filename}, 原始文件名: {original_filename}')
     
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
@@ -1080,7 +1131,126 @@ def update_item_image(item_id):
     item.images_path = json.dumps([filename])  # 更新为只包含新图片的数组
     db.session.commit()
     
-    return jsonify(item.to_dict())
+    # 验证保存的数据
+    item_dict = item.to_dict()
+    print(f'[DEBUG] 图片更新成功，新文件名: {filename}')
+    print(f'[DEBUG] 返回的 image_url: {item_dict.get("image_url")}')
+    print(f'[DEBUG] 返回的 image_urls: {item_dict.get("image_urls")}')
+    
+    return jsonify(item_dict)
+
+@app.route('/api/items/<int:item_id>/images', methods=['POST'])
+@jwt_required()
+def update_item_images(item_id):
+    """更新物品的多张图片（支持保留已存在的图片和上传新图片，按顺序更新）"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if getattr(user, 'is_banned', False):
+        return jsonify({'message': '账户已被封禁，无法修改'}), 403
+    item = Item.query.get_or_404(item_id)
+    if item.user_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    # 获取要保留的已存在图片路径（从请求参数中，按顺序）
+    keep_existing = request.form.getlist('keep_existing')  # 要保留的已存在图片路径列表（按顺序）
+    print(f'[DEBUG] 要保留的已存在图片（按顺序）: {keep_existing}')
+    
+    # 处理新上传的图片
+    image_paths = []
+    
+    # 处理主图（image）
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and hasattr(file, 'filename') and file.filename:
+            original_filename = file.filename
+            if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                if not file_too_large(file):
+                    import random
+                    timestamp = datetime.now().timestamp()
+                    random_suffix = random.randint(1000, 9999)
+                    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                    filename = secure_filename(f"{timestamp}_{random_suffix}.{ext}")
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    image_paths.append(filename)
+    
+    # 处理副图（images）
+    if 'images' in request.files:
+        files = request.files.getlist('images')
+        for file in files:
+            if file and hasattr(file, 'filename') and file.filename:
+                original_filename = file.filename
+                if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                    if not file_too_large(file):
+                        import random
+                        timestamp = datetime.now().timestamp()
+                        random_suffix = random.randint(1000, 9999)
+                        ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                        filename = secure_filename(f"{timestamp}_{random_suffix}.{ext}")
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        image_paths.append(filename)
+    
+    # 合并已存在的图片和新上传的图片
+    # keep_existing 包含要保留的图片路径（相对于 /api/image/ 的路径）
+    final_image_paths = []
+    
+    # 处理已存在的图片：从 /api/image/filename 提取 filename
+    for existing_path in keep_existing:
+        if existing_path:
+            # 支持两种格式：/api/image/filename 或直接是 filename
+            if existing_path.startswith('/api/image/'):
+                filename = existing_path.replace('/api/image/', '')
+            else:
+                filename = existing_path
+            # 验证文件是否存在
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.exists(filepath):
+                final_image_paths.append(filename)
+    
+    # 添加新上传的图片
+    final_image_paths.extend(image_paths)
+    
+    # 删除不再使用的旧图片
+    old_paths_to_delete = []
+    if item.image_path:
+        if item.image_path not in final_image_paths:
+            old_paths_to_delete.append(item.image_path)
+    if item.images_path:
+        try:
+            old_paths = json.loads(item.images_path)
+            if isinstance(old_paths, list):
+                for old_path in old_paths:
+                    if old_path not in final_image_paths:
+                        old_paths_to_delete.append(old_path)
+        except:
+            pass
+    
+    for old_path in old_paths_to_delete:
+        try:
+            old_filepath = os.path.join(app.config['UPLOAD_FOLDER'], old_path)
+            if os.path.exists(old_filepath):
+                os.remove(old_filepath)
+        except Exception as e:
+            print(f'[DEBUG] 删除旧图片失败: {old_path}, 错误: {e}')
+    
+    # 更新数据库
+    if final_image_paths:
+        item.images_path = json.dumps(final_image_paths)
+        item.image_path = final_image_paths[0]  # 第一张作为主图（向后兼容）
+        print(f'[DEBUG] 更新后的图片路径（按顺序）: {final_image_paths}')
+    else:
+        item.images_path = None
+        item.image_path = None
+        print(f'[DEBUG] 清空所有图片')
+    
+    db.session.commit()
+    
+    # 验证保存的数据
+    item_dict = item.to_dict()
+    print(f'[DEBUG] 返回的 image_urls: {item_dict.get("image_urls")}')
+    
+    return jsonify(item_dict)
 
 @app.route('/api/items/<int:item_id>/image', methods=['DELETE'])
 @jwt_required()
@@ -1098,6 +1268,7 @@ def delete_item_image(item_id):
         except:
             pass
     item.image_path = None
+    item.images_path = None
     db.session.commit()
     return jsonify(item.to_dict())
 
@@ -1131,16 +1302,44 @@ def delete_item(item_id):
 @app.route('/api/image/<path:filename>')
 def get_image(filename):
     try:
+        # 安全检查：防止路径遍历攻击
+        original_filename = filename
+        filename = os.path.basename(filename)  # 只取文件名部分，去除路径
+        
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        # 安全检查：确保文件路径在 UPLOAD_FOLDER 内
-        if not os.path.abspath(filepath).startswith(os.path.abspath(app.config['UPLOAD_FOLDER'])):
+        
+        # 再次安全检查：确保文件路径在 UPLOAD_FOLDER 内
+        upload_folder_abs = os.path.abspath(app.config['UPLOAD_FOLDER'])
+        filepath_abs = os.path.abspath(filepath)
+        if not filepath_abs.startswith(upload_folder_abs):
+            print(f'[ERROR] 路径安全检查失败: 原始={original_filename}, 清理后={filename}')
             return jsonify({'message': '无效的文件路径'}), 403
+        
         if not os.path.exists(filepath):
+            print(f'[ERROR] 图片文件不存在: {filename}')
+            print(f'[ERROR] 完整路径: {filepath_abs}')
+            print(f'[ERROR] 上传文件夹: {upload_folder_abs}')
+            # 列出上传文件夹中的文件（用于调试）
+            try:
+                files_in_folder = os.listdir(upload_folder_abs)
+                print(f'[DEBUG] 上传文件夹中的文件数量: {len(files_in_folder)}')
+                if len(files_in_folder) > 0:
+                    print(f'[DEBUG] 前5个文件: {files_in_folder[:5]}')
+            except:
+                pass
             return jsonify({'message': '图片不存在'}), 404
+        
+        # 检查是否是文件（不是目录）
+        if not os.path.isfile(filepath):
+            print(f'[ERROR] 路径不是文件: {filename}')
+            return jsonify({'message': '无效的文件路径'}), 400
+        
         return send_file(filepath)
     except Exception as e:
-        print(f'[ERROR] 获取图片失败: {filename}, 错误: {e}')
-        return jsonify({'message': '获取图片失败'}), 500
+        import traceback
+        print(f'[ERROR] 获取图片失败: 原始={original_filename if "original_filename" in locals() else filename}, 错误: {e}')
+        traceback.print_exc()
+        return jsonify({'message': f'获取图片失败: {str(e)}'}), 500
 
 
 @app.route('/api/avatar/<path:filename>')
@@ -1330,6 +1529,19 @@ def admin_reports():
         it = Item.query.get(r.item_id) if r.item_id else None
         rep_user = User.query.get(r.reporter_id) if r.reporter_id else None
         tgt_user = User.query.get(r.target_user_id) if r.target_user_id else None
+        # 处理多张证据图片
+        evidence_image_urls = []
+        if r.evidence_images_path:
+            try:
+                evidence_paths = json.loads(r.evidence_images_path)
+                if isinstance(evidence_paths, list):
+                    evidence_image_urls = [f'/api/image/{path}' for path in evidence_paths if path]
+            except:
+                pass
+        # 向后兼容：如果没有多张图片但有主图，使用主图
+        if not evidence_image_urls and r.evidence_image_path:
+            evidence_image_urls = [f'/api/image/{r.evidence_image_path}']
+        
         result.append({
             'id': r.id,
             'reporter_id': r.reporter_id,
@@ -1343,7 +1555,8 @@ def admin_reports():
             'category': r.category,
             'description': r.description,
             'severity': r.severity,
-            'evidence_image_url': (f'/api/image/{r.evidence_image_path}' if r.evidence_image_path else None),
+            'evidence_image_url': evidence_image_urls[0] if evidence_image_urls else None,  # 主图（向后兼容）
+            'evidence_image_urls': evidence_image_urls,  # 所有图片列表
             'resolution_note': r.resolution_note,
             'status': r.status,
             'user_withdrawn': bool(r.user_withdrawn),
@@ -1389,6 +1602,19 @@ def my_reports():
     result = []
     for r in reps:
         it = Item.query.get(r.item_id) if r.item_id else None
+        # 处理多张证据图片
+        evidence_image_urls = []
+        if r.evidence_images_path:
+            try:
+                evidence_paths = json.loads(r.evidence_images_path)
+                if isinstance(evidence_paths, list):
+                    evidence_image_urls = [f'/api/image/{path}' for path in evidence_paths if path]
+            except:
+                pass
+        # 向后兼容：如果没有多张图片但有主图，使用主图
+        if not evidence_image_urls and r.evidence_image_path:
+            evidence_image_urls = [f'/api/image/{r.evidence_image_path}']
+        
         result.append({
             'id': r.id,
             'item_id': r.item_id,
@@ -1399,12 +1625,13 @@ def my_reports():
             'status': r.status,
             'created_at': r.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'resolution_note': r.resolution_note,
-            'evidence_image_url': (f'/api/image/{r.evidence_image_path}' if r.evidence_image_path else None)
+            'evidence_image_url': evidence_image_urls[0] if evidence_image_urls else None,  # 主图（向后兼容）
+            'evidence_image_urls': evidence_image_urls  # 所有图片列表
         })
     return jsonify(result)
 
 @app.route('/api/reports/<int:report_id>', methods=['PUT','POST'])
-@jwt_required()
+@jwt_required(optional=False)
 def update_report_by_user(report_id):
     user_id = int(get_jwt_identity())
     report = Report.query.get_or_404(report_id)
@@ -1412,22 +1639,138 @@ def update_report_by_user(report_id):
         return jsonify({'message': 'forbidden'}), 403
     if getattr(report, 'user_withdrawn', False):
         return jsonify({'message': '你已撤回举报，信息已锁定，无法修改'}), 403
-    evidence_path = report.evidence_image_path
+    
+    # 调试信息
+    print(f'[DEBUG] 请求方法: {request.method}')
+    print(f'[DEBUG] Content-Type: {request.content_type}')
+    print(f'[DEBUG] is_json: {request.is_json}')
+    print(f'[DEBUG] has form: {request.form is not None}')
+    print(f'[DEBUG] has files: {len(request.files) > 0}')
+    
+    # 检查 Content-Type，如果不是 multipart/form-data 且没有文件，可能是 JSON 请求
+    content_type = request.content_type or ''
+    is_multipart = 'multipart/form-data' in content_type.lower()
+    
+    # 获取要保留的已存在图片路径（从请求参数中，按顺序）
+    keep_existing = []
+    if request.form:
+        keep_existing = request.form.getlist('keep_existing')
+        print(f'[DEBUG] keep_existing: {keep_existing}')
+    elif not is_multipart and not request.files:
+        # 可能是 JSON 请求，直接处理 JSON 数据
+        data = request.json or {}
+        if data.get('withdraw'):
+            report.user_withdrawn = True
+            report.status = 'withdrawn'
+        if report.status != 'resolved':
+            report.category = data.get('category', report.category)
+            report.severity = data.get('severity', report.severity)
+            report.description = data.get('description', report.description)
+            if 'anonymous' in data:
+                report.anonymous = bool(str(data.get('anonymous')).lower() in ['true','1','yes'])
+        db.session.commit()
+        return jsonify({'message': 'updated'})
+    
+    # 处理新上传的图片
+    new_evidence_paths = []
+    
+    # 处理主图（image）
     if 'image' in request.files:
         file = request.files['image']
-        if file_too_large(file):
-            return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
-        if file and allowed_file(file.filename):
-            filename = secure_filename(f"evidence_{datetime.now().timestamp()}_{file.filename}")
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            if evidence_path:
-                try:
-                    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], evidence_path))
-                except:
-                    pass
-            evidence_path = filename
-    data = request.form.to_dict() if 'image' in request.files else (request.json or {})
+        if file and hasattr(file, 'filename') and file.filename:
+            original_filename = file.filename
+            if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                if not file_too_large(file):
+                    import random
+                    timestamp = datetime.now().timestamp()
+                    random_suffix = random.randint(1000, 9999)
+                    ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                    filename = secure_filename(f"evidence_{timestamp}_{random_suffix}.{ext}")
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    new_evidence_paths.append(filename)
+    
+    # 处理副图（images）
+    if 'images' in request.files:
+        files = request.files.getlist('images')
+        for file in files:
+            if file and hasattr(file, 'filename') and file.filename:
+                original_filename = file.filename
+                if original_filename.lower() != 'blob' and allowed_file(original_filename):
+                    if not file_too_large(file):
+                        import random
+                        timestamp = datetime.now().timestamp()
+                        random_suffix = random.randint(1000, 9999)
+                        ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else 'jpg'
+                        filename = secure_filename(f"evidence_{timestamp}_{random_suffix}.{ext}")
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        new_evidence_paths.append(filename)
+    
+    # 合并已存在的图片和新上传的图片
+    final_evidence_paths = []
+    
+    # 处理已存在的图片：从 /api/image/filename 或直接是 filename 提取
+    # 使用 Set 去重，避免重复添加
+    seen_filenames = set()
+    for existing_path in keep_existing:
+        if existing_path:
+            if existing_path.startswith('/api/image/'):
+                filename = existing_path.replace('/api/image/', '')
+            else:
+                filename = existing_path
+            # 去重：如果已经添加过，跳过
+            if filename not in seen_filenames:
+                # 验证文件是否存在
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                if os.path.exists(filepath):
+                    final_evidence_paths.append(filename)
+                    seen_filenames.add(filename)
+    
+    # 添加新上传的图片（也去重）
+    for new_path in new_evidence_paths:
+        if new_path and new_path not in seen_filenames:
+            final_evidence_paths.append(new_path)
+            seen_filenames.add(new_path)
+    
+    # 删除不再使用的旧图片
+    old_paths_to_delete = []
+    if report.evidence_image_path:
+        if report.evidence_image_path not in final_evidence_paths:
+            old_paths_to_delete.append(report.evidence_image_path)
+    if report.evidence_images_path:
+        try:
+            old_paths = json.loads(report.evidence_images_path)
+            if isinstance(old_paths, list):
+                for old_path in old_paths:
+                    if old_path not in final_evidence_paths:
+                        old_paths_to_delete.append(old_path)
+        except:
+            pass
+    
+    for old_path in old_paths_to_delete:
+        try:
+            old_filepath = os.path.join(app.config['UPLOAD_FOLDER'], old_path)
+            if os.path.exists(old_filepath):
+                os.remove(old_filepath)
+        except Exception as e:
+            print(f'[DEBUG] 删除旧证据图片失败: {old_path}, 错误: {e}')
+    
+    # 更新数据库
+    if final_evidence_paths:
+        report.evidence_images_path = json.dumps(final_evidence_paths)
+        report.evidence_image_path = final_evidence_paths[0]  # 第一张作为主图（向后兼容）
+    else:
+        report.evidence_images_path = None
+        report.evidence_image_path = None
+    
+    # 获取其他表单数据
+    # 优先从 form 获取（multipart/form-data），否则从 json 获取
+    data = {}
+    if request.form:
+        data = request.form.to_dict()
+    elif request.is_json:
+        data = request.json or {}
     if data.get('withdraw'):
         report.user_withdrawn = True
         report.status = 'withdrawn'
@@ -1437,7 +1780,7 @@ def update_report_by_user(report_id):
         report.description = data.get('description', report.description)
         if 'anonymous' in data:
             report.anonymous = bool(str(data.get('anonymous')).lower() in ['true','1','yes'])
-    report.evidence_image_path = evidence_path
+    
     db.session.commit()
     return jsonify({'message': 'updated'})
 
@@ -1816,6 +2159,11 @@ def send_image_message(conversation_id):
     if conversation.user1_id != user_id and conversation.user2_id != user_id:
         return jsonify({'message': '无权限访问此会话'}), 403
     
+    # 确定接收者
+    receiver_id = conversation.user2_id if conversation.user1_id == user_id else conversation.user1_id
+    if getattr(user, 'is_banned', False) and (user.banned_by is None or receiver_id != user.banned_by):
+        return jsonify({'message': '账户已被封禁，只能联系封禁管理员'}), 403
+    
     # 检查是否有文件
     if 'image' not in request.files:
         return jsonify({'message': '未上传图片'}), 400
@@ -1823,21 +2171,64 @@ def send_image_message(conversation_id):
     file = request.files['image']
     if file_too_large(file):
         return jsonify({'message': '图片大小超过限制（最大10MB）'}), 400
-    if file.filename == '':
-        return jsonify({'message': '未选择文件'}), 400
     
-    if file and allowed_file(file.filename):
-        # 保存图片
-        filename = secure_filename(f"msg_{datetime.now().timestamp()}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-    # 确定接收者
-    receiver_id = conversation.user2_id if conversation.user1_id == user_id else conversation.user1_id
-    if getattr(user, 'is_banned', False) and (user.banned_by is None or receiver_id != user.banned_by):
-        return jsonify({'message': '账户已被封禁，只能联系封禁管理员'}), 403
+    original_filename = file.filename if hasattr(file, 'filename') else None
     
-    return jsonify({'message': '不支持的图片格式'}), 400
+    # 如果文件名为空或者是 "blob"，生成一个默认文件名
+    if not original_filename or original_filename == '' or original_filename.lower() == 'blob':
+        # 根据文件内容类型确定扩展名
+        content_type = file.content_type if hasattr(file, 'content_type') else 'image/jpeg'
+        ext_map = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+            'image/bmp': 'bmp'
+        }
+        ext = ext_map.get(content_type, 'jpg')
+        original_filename = f'image_{datetime.now().timestamp()}.{ext}'
+    
+    # 检查文件格式
+    if not allowed_file(original_filename):
+        return jsonify({'message': '不支持的图片格式'}), 400
+    
+    # 保存图片
+    filename = secure_filename(f"msg_{datetime.now().timestamp()}_{original_filename}")
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    # 创建消息记录
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=user_id,
+        receiver_id=receiver_id,
+        content=None,
+        message_type='image',
+        image_path=filename
+    )
+    
+    db.session.add(message)
+    
+    # 更新会话的最后消息
+    conversation.last_message = '[图片]'
+    conversation.last_message_time = datetime.now()
+    
+    db.session.commit()
+    
+    # 创建系统通知给接收者
+    sender = User.query.get(user_id)
+    create_notification(
+        receiver_id,
+        '新消息',
+        f'{sender.username} 给你发送了一张图片',
+        'info'
+    )
+    
+    # 实时推送消息给接收者
+    socketio.emit('new_message', message.to_dict(receiver_id), room=f'user_{receiver_id}')
+    
+    return jsonify(message.to_dict(user_id)), 201
 
 @app.route('/api/message-image/<filename>', methods=['GET'])
 def get_message_image(filename):

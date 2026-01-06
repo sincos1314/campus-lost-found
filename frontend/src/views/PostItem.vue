@@ -343,9 +343,7 @@ const handleSubmit = async () => {
         console.log('[DEBUG] FormData:', pair[0], pair[1])
       }
 
-      const response = await request.post('/items', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const response = await request.post('/items', formData)
       
       console.log('[DEBUG] 服务器返回的数据:', response)
       console.log('[DEBUG] image_url:', response.image_url)
