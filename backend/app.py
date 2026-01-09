@@ -409,7 +409,7 @@ with app.app_context():
         print(f'item migration skipped: {e}')
 
 # 文件上传辅助函数
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'svg', 'tiff', 'tif', 'ico', 'heic', 'heif'}
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 
 def allowed_file(filename):
@@ -1556,6 +1556,17 @@ def admin_user_ban(user_id):
             return jsonify({'message': 'forbidden'}), 403
         user.is_banned = False
         user.banned_by = None
+        # 创建解封通知
+        try:
+            create_notification(
+                user.id,
+                '账户解封',
+                f'{current_admin.username} 于 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} 已为你解封，现在可以正常使用系统了。',
+                'success'
+            )
+            print(f'[DEBUG] 已为用户 {user.id} ({user.username}) 创建解封通知')
+        except Exception as e:
+            print(f'[ERROR] 创建解封通知失败: {e}')
     db.session.commit()
     return jsonify(user.to_dict())
 

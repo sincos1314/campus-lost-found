@@ -56,7 +56,7 @@
             <el-form-item label="院系">
               <el-input v-model="form.department" />
             </el-form-item>
-            <el-form-item label="年级">
+            <el-form-item v-if="user?.user_type !== 'teacher'" label="年级">
               <el-select v-model="form.grade" placeholder="选择年级">
                 <el-option label="大一" value="大一" />
                 <el-option label="大二" value="大二" />
@@ -64,10 +64,10 @@
                 <el-option label="大四" value="大四" />
               </el-select>
             </el-form-item>
-            <el-form-item label="班级">
+            <el-form-item v-if="user?.user_type !== 'teacher'" label="班级">
               <el-input v-model="form.class_name" />
             </el-form-item>
-            <el-form-item label="学号">
+            <el-form-item :label="user?.user_type === 'teacher' ? '工号' : '学号'">
               <el-input v-model="form.student_id" />
             </el-form-item>
             <el-form-item label="性别">
@@ -223,10 +223,16 @@ const handleUpdate = async () => {
         email: form.email,
         phone: form.phone,
         department: form.department,
-        grade: form.grade,
-        class_name: form.class_name,
-        student_id: form.student_id,
         gender: form.gender
+      }
+      // 只有学生才更新年级、班级和学号
+      if (user.value?.user_type !== 'teacher') {
+        updateData.grade = form.grade
+        updateData.class_name = form.class_name
+        updateData.student_id = form.student_id
+      } else {
+        // 教师只更新工号（存储在 student_id 字段中）
+        updateData.student_id = form.student_id
       }
       if (form.password) {
         updateData.password = form.password

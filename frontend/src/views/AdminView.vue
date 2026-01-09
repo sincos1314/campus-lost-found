@@ -443,12 +443,48 @@
         <el-descriptions-item label="发布时间">{{
           currentItem?.created_at
         }}</el-descriptions-item>
-        <el-descriptions-item label="图片">
-          <img
-            v-if="currentItem?.image_url"
-            :src="absoluteUrl(currentItem.image_url)"
-            style="max-width: 100%; border-radius: 8px"
-          />
+        <el-descriptions-item label="图片" :span="2">
+          <div v-if="currentItem?.image_urls && currentItem.image_urls.length > 0" class="admin-item-images">
+            <div class="admin-image-carousel">
+              <el-button
+                v-if="currentItem.image_urls.length > 1"
+                class="carousel-btn prev-btn"
+                @click="prevAdminImage"
+                :disabled="currentAdminImageIndex === 0"
+              >
+                <el-icon><ArrowLeft /></el-icon>
+              </el-button>
+              <el-image
+                :src="absoluteUrl(currentItem.image_urls[currentAdminImageIndex])"
+                :preview-src-list="currentItem.image_urls.map(url => absoluteUrl(url))"
+                :initial-index="currentAdminImageIndex"
+                fit="cover"
+                class="admin-main-image"
+                style="max-width: 100%; border-radius: 8px"
+                preview-teleported
+              />
+              <el-button
+                v-if="currentItem.image_urls.length > 1"
+                class="carousel-btn next-btn"
+                @click="nextAdminImage"
+                :disabled="currentAdminImageIndex === currentItem.image_urls.length - 1"
+              >
+                <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+            <div v-if="currentItem.image_urls.length > 1" class="admin-image-counter">
+              {{ currentAdminImageIndex + 1 }} / {{ currentItem.image_urls.length }}
+            </div>
+          </div>
+          <div v-else-if="currentItem?.image_url" class="admin-item-images">
+            <el-image
+              :src="absoluteUrl(currentItem.image_url)"
+              :preview-src-list="[absoluteUrl(currentItem.image_url)]"
+              fit="cover"
+              style="max-width: 100%; border-radius: 8px"
+              preview-teleported
+            />
+          </div>
           <span v-else>无图片</span>
         </el-descriptions-item>
       </el-descriptions>
@@ -559,6 +595,7 @@ import request, { absoluteUrl, previewList, previewListMultiple } from "../utils
 import { getUser } from "../utils/auth";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
+import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 const router = useRouter();
 const tab = ref("users");
 const users = ref([]);
@@ -578,6 +615,8 @@ const itemsPage = ref(1);
 const reportsPage = ref(1);
 // 存储每个举报的当前证据图片索引
 const evidenceImageIndices = ref({});
+// 管理员物品详情对话框中的当前图片索引
+const currentAdminImageIndex = ref(0);
 const me = getUser();
 const isAdmin = computed(() => me?.role === 'admin');
 const meLevel = me?.admin_level || "";
@@ -944,7 +983,20 @@ const viewUser = (row) => {
 };
 const viewItem = (row) => {
   currentItem.value = row;
+  currentAdminImageIndex.value = 0; // 重置图片索引
   itemDialog.value = true;
+};
+
+const prevAdminImage = () => {
+  if (currentItem.value?.image_urls && currentAdminImageIndex.value > 0) {
+    currentAdminImageIndex.value--;
+  }
+};
+
+const nextAdminImage = () => {
+  if (currentItem.value?.image_urls && currentAdminImageIndex.value < currentItem.value.image_urls.length - 1) {
+    currentAdminImageIndex.value++;
+  }
 };
 </script>
 
@@ -1344,8 +1396,7 @@ const viewItem = (row) => {
 }
 
 .admin-container :deep(.el-dialog .el-input__wrapper),
-.admin-container :deep(.el-dialog .el-select__wrapper),
-.admin-container :deep(.el-dialog .el-textarea__inner) {
+.admin-container :deep(.el-dialog .el-select__wrapper) {
   border: var(--border-width) solid var(--border-color) !important;
   border-radius: var(--border-radius) !important;
   background: var(--color-card) !important;
@@ -1353,16 +1404,27 @@ const viewItem = (row) => {
   padding: 0.6rem 1rem !important;
 }
 
-.admin-container :deep(.el-dialog .el-input__inner),
+/* textarea 需要特殊处理，因为它没有 wrapper */
 .admin-container :deep(.el-dialog .el-textarea__inner) {
-  /* textarea 的 inner 需要保持边框 */
   border: var(--border-width) solid var(--border-color) !important;
   border-radius: var(--border-radius) !important;
   background: var(--color-card) !important;
+  box-shadow: none !important;
+  padding: 0.6rem 1rem !important;
   color: var(--color-text) !important;
   font-weight: 700 !important;
   font-size: 0.95rem !important;
-  padding: 0.6rem 1rem !important;
+}
+
+.admin-container :deep(.el-dialog .el-input__inner) {
+  /* 去掉内层边框，只保留外层边框 */
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  padding: 0 !important;
 }
 
 .admin-container :deep(.el-dialog .el-select__placeholder),
@@ -1381,12 +1443,6 @@ const viewItem = (row) => {
   border-color: var(--border-color) !important;
 }
 
-/* 确保 textarea 的 focus 状态也有阴影效果 */
-.admin-container :deep(.el-dialog .el-textarea__inner:focus) {
-  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
-  border-color: var(--border-color) !important;
-}
-
 .admin-container :deep(.el-dialog .el-date-editor .el-input__wrapper) {
   border: var(--border-width) solid var(--border-color) !important;
   border-radius: var(--border-radius) !important;
@@ -1396,5 +1452,68 @@ const viewItem = (row) => {
 
 .admin-container :deep(.el-dialog .el-date-editor .el-input__wrapper.is-focus) {
   box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color) !important;
+}
+
+/* 管理员物品详情图片轮播样式 */
+.admin-item-images {
+  width: 100%;
+  position: relative;
+}
+
+.admin-image-carousel {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-main-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.carousel-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.prev-btn {
+  left: 10px;
+}
+
+.next-btn {
+  right: 10px;
+}
+
+.admin-image-counter {
+  text-align: center;
+  margin-top: 10px;
+  font-weight: 600;
+  color: var(--color-text);
 }
 </style>
