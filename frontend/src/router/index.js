@@ -66,6 +66,24 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/my-favorites',
+      name: 'myFavorites',
+      component: () => import('../views/MyFavorites.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/my-claims',
+      name: 'myClaims',
+      component: () => import('../views/MyClaims.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/claim-management',
+      name: 'claimManagement',
+      component: () => import('../views/ClaimManagement.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/messages',
       name: 'messages',
       component: () => import('../views/MessagesView.vue'),

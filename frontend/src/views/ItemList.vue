@@ -244,7 +244,16 @@ const loadItems = async () => {
 };
 
 const goToDetail = (id) => {
-  router.push(`/item/${id}`);
+  // 保存当前页码到路由query参数，以便返回时恢复
+  router.push({
+    path: `/item/${id}`,
+    query: {
+      from: 'list',
+      category: category.value,
+      page: page.value,
+      ...filters.value
+    }
+  });
 };
 
 // 获取物品的图片URL（支持多张图片）
@@ -306,6 +315,26 @@ onMounted(() => {
   if (typeof route.query.search === "string") {
     filters.value.search = route.query.search;
   }
+  
+  // 恢复页码（从详情页返回时）
+  if (route.query.page) {
+    const pageNum = parseInt(route.query.page)
+    if (!isNaN(pageNum) && pageNum > 0) {
+      page.value = pageNum
+    }
+  }
+  
+  // 恢复其他筛选条件
+  if (route.query.item_type) {
+    filters.value.item_type = route.query.item_type
+  }
+  if (route.query.status) {
+    filters.value.status = route.query.status
+  }
+  if (route.query.start_date && route.query.end_date) {
+    filters.value.dateRange = [route.query.start_date, route.query.end_date]
+  }
+  
   loadItems();
 });
 

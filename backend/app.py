@@ -337,6 +337,141 @@ class Report(db.Model):
     anonymous = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class Favorite(db.Model):
+    """收藏表"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # 关联关系
+    user = db.relationship('User', backref='favorites')
+    item = db.relationship('Item', backref='favorited_by')
+    
+    # 唯一约束：一个用户只能收藏一个物品一次
+    __table_args__ = (db.UniqueConstraint('user_id', 'item_id', name='unique_user_item_favorite'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'item_id': self.item_id,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+class Comment(db.Model):
+    """评论表"""
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('comment.id'))  # 父评论ID（用于回复）
+    reply_to_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # 回复的目标用户ID（用于二级回复）
+    is_deleted = db.Column(db.Boolean, default=False)
+    like_count = db.Column(db.Integer, default=0)  # 点赞数
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # 关联关系
+    item = db.relationship('Item', backref='comments')
+    user = db.relationship('User', foreign_keys=[user_id], backref='comments')
+    reply_to_user = db.relationship('User', foreign_keys=[reply_to_user_id], backref='replied_comments')
+    parent = db.relationship('Comment', remote_side=[id], backref='replies')
+    
+    def to_dict(self, current_user_id=None):
+        # 检查当前用户是否已点赞
+        is_liked = False
+        if current_user_id:
+            is_liked = CommentLike.query.filter_by(
+                comment_id=self.id,
+                user_id=current_user_id
+            ).first() is not None
+        
+        # 判断是几级回复
+        level = 0  # 0表示顶级评论
+        if self.parent_id:
+            parent_comment = Comment.query.get(self.parent_id)
+            if parent_comment:
+                if parent_comment.parent_id:
+                    level = 2  # 二级回复（回复的回复）
+                else:
+                    level = 1  # 一级回复（回复顶级评论）
+        
+        return {
+            'id': self.id,
+            'item_id': self.item_id,
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else None,
+            'user_avatar': f'/api/avatar/{self.user.avatar_path}' if self.user and self.user.avatar_path else None,
+            'content': self.content,
+            'parent_id': self.parent_id,
+            'reply_to_user_id': self.reply_to_user_id,
+            'reply_to_username': self.reply_to_user.username if self.reply_to_user else None,
+            'is_deleted': self.is_deleted,
+            'like_count': self.like_count,
+            'is_liked': is_liked,
+            'level': level,  # 回复层级：1=一级回复，2=二级回复
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'replies': [reply.to_dict(current_user_id) for reply in self.replies if not reply.is_deleted] if self.replies else [],
+            'replies_count': len([r for r in self.replies if not r.is_deleted]) if self.replies else 0
+        }
+
+class CommentLike(db.Model):
+    """评论点赞表"""
+    id = db.Column(db.Integer, primary_key=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # 关联关系
+    comment = db.relationship('Comment', backref='likes')
+    user = db.relationship('User', backref='comment_likes')
+    
+    # 唯一约束：一个用户只能点赞一个评论一次
+    __table_args__ = (db.UniqueConstraint('comment_id', 'user_id', name='unique_comment_user_like'),)
+
+class Claim(db.Model):
+    """认领表"""
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    claimant_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # 认领人
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # 发布者
+    description = db.Column(db.Text)  # 认领说明/证据描述
+    image_path = db.Column(db.String(255))  # 认领证据图片路径（单张，JSON格式存储多张）
+    status = db.Column(db.String(20), default='pending')  # pending: 待确认, approved: 已确认, rejected: 已拒绝
+    is_public = db.Column(db.Boolean, default=False)  # 是否公开认领历史
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # 关联关系
+    item = db.relationship('Item', backref='claims')
+    claimant = db.relationship('User', foreign_keys=[claimant_id], backref='claims_made')
+    owner = db.relationship('User', foreign_keys=[owner_id], backref='claims_received')
+    
+    def to_dict(self):
+        # 解析图片路径（支持JSON格式的多张图片）
+        image_urls = []
+        if self.image_path:
+            try:
+                import json
+                image_paths = json.loads(self.image_path) if self.image_path.startswith('[') else [self.image_path]
+                image_urls = [f'/api/image/{path}' for path in image_paths]
+            except:
+                image_urls = [f'/api/image/{self.image_path}'] if self.image_path else []
+        
+        return {
+            'id': self.id,
+            'item_id': self.item_id,
+            'claimant_id': self.claimant_id,
+            'claimant_username': self.claimant.username if self.claimant else None,
+            'owner_id': self.owner_id,
+            'description': self.description,
+            'image_urls': image_urls,
+            'status': self.status,
+            'is_public': bool(self.is_public),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None
+        }
+
 # 创建数据库表
 with app.app_context():
     db.create_all()
@@ -407,6 +542,108 @@ with app.app_context():
         print('✅ Item 表迁移成功：已添加 images_path 字段')
     except Exception as e:
         print(f'item migration skipped: {e}')
+    
+    # 创建新表（如果不存在）
+    try:
+        import sqlite3
+        conn = sqlite3.connect(os.path.join(basedir, 'lost_found.db'))
+        cur = conn.cursor()
+        
+        # 检查表是否存在
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='favorite'")
+        if not cur.fetchone():
+            cur.execute("""
+                CREATE TABLE favorite (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user (id),
+                    FOREIGN KEY (item_id) REFERENCES item (id),
+                    UNIQUE(user_id, item_id)
+                )
+            """)
+            print('✅ Favorite 表创建成功')
+        
+        # 检查并添加claim表的image_path字段
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='claim'")
+        if cur.fetchone():
+            cur.execute("PRAGMA table_info(claim)")
+            claim_cols = [row[1] for row in cur.fetchall()]
+            if 'image_path' not in claim_cols:
+                cur.execute("ALTER TABLE claim ADD COLUMN image_path TEXT")
+                print('✅ Claim 表迁移成功：已添加 image_path 字段')
+            # 检查并添加is_public字段
+            if 'is_public' not in claim_cols:
+                cur.execute("ALTER TABLE claim ADD COLUMN is_public BOOLEAN DEFAULT 0")
+                print('✅ Claim 表迁移成功：已添加 is_public 字段')
+        
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='comment'")
+        if not cur.fetchone():
+            cur.execute("""
+                CREATE TABLE comment (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    parent_id INTEGER,
+                    is_deleted BOOLEAN DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES item (id),
+                    FOREIGN KEY (user_id) REFERENCES user (id),
+                    FOREIGN KEY (parent_id) REFERENCES comment (id)
+                )
+            """)
+            print('✅ Comment 表创建成功')
+        
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='claim'")
+        if not cur.fetchone():
+            cur.execute("""
+                CREATE TABLE claim (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id INTEGER NOT NULL,
+                    claimant_id INTEGER NOT NULL,
+                    owner_id INTEGER NOT NULL,
+                    description TEXT,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES item (id),
+                    FOREIGN KEY (claimant_id) REFERENCES user (id),
+                    FOREIGN KEY (owner_id) REFERENCES user (id)
+                )
+            """)
+            print('✅ Claim 表创建成功')
+        
+        # 检查comment表是否需要添加新字段
+        cur.execute("PRAGMA table_info(comment)")
+        comment_cols = [row[1] for row in cur.fetchall()]
+        if 'like_count' not in comment_cols:
+            cur.execute("ALTER TABLE comment ADD COLUMN like_count INTEGER DEFAULT 0")
+            print('✅ Comment 表已添加 like_count 字段')
+        if 'reply_to_user_id' not in comment_cols:
+            cur.execute("ALTER TABLE comment ADD COLUMN reply_to_user_id INTEGER")
+            print('✅ Comment 表已添加 reply_to_user_id 字段')
+        
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='comment_like'")
+        if not cur.fetchone():
+            cur.execute("""
+                CREATE TABLE comment_like (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    comment_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (comment_id) REFERENCES comment (id),
+                    FOREIGN KEY (user_id) REFERENCES user (id),
+                    UNIQUE(comment_id, user_id)
+                )
+            """)
+            print('✅ CommentLike 表创建成功')
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f'新表创建失败: {e}')
 
 # 文件上传辅助函数
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'svg', 'tiff', 'tif', 'ico', 'heic', 'heif'}
@@ -2079,6 +2316,617 @@ def get_my_stats():
         'my_found': my_found,
         'my_solved': my_solved
     })
+
+# ==================== 收藏相关API ====================
+
+@app.route('/api/items/<int:item_id>/favorite', methods=['POST'])
+@jwt_required()
+def add_favorite(item_id):
+    """收藏物品"""
+    user_id = int(get_jwt_identity())
+    item = Item.query.get_or_404(item_id)
+    
+    # 检查是否已收藏
+    existing = Favorite.query.filter_by(user_id=user_id, item_id=item_id).first()
+    if existing:
+        return jsonify({'message': '已收藏'}), 400
+    
+    favorite = Favorite(user_id=user_id, item_id=item_id)
+    db.session.add(favorite)
+    db.session.commit()
+    
+    # 创建通知给发布者
+    if item.user_id != user_id:
+        create_notification(
+            item.user_id,
+            '物品被收藏',
+            f'你的{item.category == "lost" and "失物" or "拾物"}《{item.title}》被收藏了',
+            'info',
+            item_id
+        )
+    
+    return jsonify({'message': '收藏成功', 'favorite': favorite.to_dict()}), 201
+
+@app.route('/api/items/<int:item_id>/favorite', methods=['DELETE'])
+@jwt_required()
+def remove_favorite(item_id):
+    """取消收藏"""
+    user_id = int(get_jwt_identity())
+    favorite = Favorite.query.filter_by(user_id=user_id, item_id=item_id).first()
+    
+    if not favorite:
+        return jsonify({'message': '未收藏'}), 404
+    
+    db.session.delete(favorite)
+    db.session.commit()
+    
+    return jsonify({'message': '取消收藏成功'})
+
+@app.route('/api/items/<int:item_id>/favorite/status', methods=['GET'])
+@jwt_required()
+def get_favorite_status(item_id):
+    """获取收藏状态"""
+    user_id = int(get_jwt_identity())
+    favorite = Favorite.query.filter_by(user_id=user_id, item_id=item_id).first()
+    
+    return jsonify({'is_favorited': favorite is not None})
+
+@app.route('/api/my-favorites', methods=['GET'])
+@jwt_required()
+def get_my_favorites():
+    """获取我的收藏列表"""
+    user_id = int(get_jwt_identity())
+    page = int(request.args.get('page', 1) or 1)
+    page_size = int(request.args.get('page_size', 12) or 12)
+    
+    favorites = Favorite.query.filter_by(user_id=user_id)\
+        .order_by(Favorite.created_at.desc())\
+        .paginate(page=page, per_page=page_size, error_out=False)
+    
+    items = [fav.item.to_dict() for fav in favorites.items]
+    
+    return jsonify({
+        'items': items,
+        'total': favorites.total,
+        'page': page,
+        'page_size': page_size
+    })
+
+# ==================== 评论相关API ====================
+
+@app.route('/api/items/<int:item_id>/comments', methods=['GET'])
+def get_comments(item_id):
+    """获取物品评论列表"""
+    # 尝试获取当前用户ID（如果已登录）
+    current_user_id = None
+    try:
+        # 从请求头或查询参数获取token
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            from flask_jwt_extended import decode_token
+            decoded = decode_token(token)
+            current_user_id = int(decoded['sub'])
+    except:
+        pass
+    
+    # 获取顶级评论（parent_id为None）
+    top_level_comments = Comment.query.filter_by(item_id=item_id, parent_id=None, is_deleted=False)\
+        .order_by(Comment.created_at.desc()).all()
+    
+    result = []
+    for comment in top_level_comments:
+        comment_dict = comment.to_dict(current_user_id)
+        # 获取该评论的所有一级回复
+        level1_replies = Comment.query.filter_by(parent_id=comment.id, is_deleted=False)\
+            .order_by(Comment.created_at.asc()).all()
+        
+        # 获取所有二级回复（parent_id指向一级回复的）
+        all_replies = []
+        for level1_reply in level1_replies:
+            level1_reply_dict = level1_reply.to_dict(current_user_id)
+            # 获取该一级回复的所有二级回复
+            level2_replies = Comment.query.filter_by(parent_id=level1_reply.id, is_deleted=False)\
+                .order_by(Comment.created_at.asc()).all()
+            level1_reply_dict['level2_replies'] = [r.to_dict(current_user_id) for r in level2_replies]
+            all_replies.append(level1_reply_dict)
+        
+        comment_dict['replies'] = all_replies
+        comment_dict['replies_count'] = len(all_replies)
+        result.append(comment_dict)
+    
+    return jsonify(result)
+
+@app.route('/api/items/<int:item_id>/comments', methods=['POST'])
+@jwt_required()
+def create_comment(item_id):
+    """创建评论"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if getattr(user, 'is_banned', False):
+        return jsonify({'message': '账户已被封禁，无法评论'}), 403
+    
+    item = Item.query.get_or_404(item_id)
+    data = request.json
+    content = data.get('content', '').strip()
+    parent_id = data.get('parent_id')
+    reply_to_user_id = data.get('reply_to_user_id')  # 回复的目标用户ID
+    
+    if not content:
+        return jsonify({'message': '评论内容不能为空'}), 400
+    
+    # 如果是回复，确定reply_to_user_id
+    if parent_id:
+        parent_comment = Comment.query.get(parent_id)
+        if parent_comment:
+            # 如果指定了reply_to_user_id，使用指定的；否则回复父评论的作者
+            if not reply_to_user_id:
+                reply_to_user_id = parent_comment.user_id
+            # 如果自己回复自己，reply_to_user_id保持为父评论的作者（用于显示格式判断）
+        else:
+            return jsonify({'message': '父评论不存在'}), 404
+    
+    comment = Comment(
+        item_id=item_id,
+        user_id=user_id,
+        content=content,
+        parent_id=parent_id,
+        reply_to_user_id=reply_to_user_id
+    )
+    
+    db.session.add(comment)
+    db.session.commit()
+    
+    # 刷新对象以获取关联数据
+    db.session.refresh(comment)
+    
+    # 创建通知
+    if parent_id:
+        # 回复评论：通知被回复的用户
+        if reply_to_user_id and reply_to_user_id != user_id:
+            create_notification(
+                reply_to_user_id,
+                '新回复',
+                f'{user.username} 回复了你的评论',
+                'info',
+                item_id
+            )
+    else:
+        # 一级评论：通知物品发布者
+        if item.user_id != user_id:
+            create_notification(
+                item.user_id,
+                '新评论',
+                f'{user.username} 评论了你的{item.category == "lost" and "失物" or "拾物"}《{item.title}》',
+                'info',
+                item_id
+            )
+    
+    return jsonify(comment.to_dict(user_id)), 201
+
+@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
+@jwt_required()
+def update_comment(comment_id):
+    """更新评论"""
+    user_id = int(get_jwt_identity())
+    comment = Comment.query.get_or_404(comment_id)
+    
+    if comment.user_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    data = request.json
+    content = data.get('content', '').strip()
+    
+    if not content:
+        return jsonify({'message': '评论内容不能为空'}), 400
+    
+    comment.content = content
+    db.session.commit()
+    
+    return jsonify(comment.to_dict(user_id))
+
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_comment(comment_id):
+    """删除评论（软删除）"""
+    user_id = int(get_jwt_identity())
+    comment = Comment.query.get_or_404(comment_id)
+    
+    if comment.user_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    comment.is_deleted = True
+    db.session.commit()
+    
+    return jsonify({'message': '删除成功'})
+
+@app.route('/api/comments/<int:comment_id>/like', methods=['POST'])
+@jwt_required()
+def like_comment(comment_id):
+    """点赞评论"""
+    user_id = int(get_jwt_identity())
+    comment = Comment.query.get_or_404(comment_id)
+    
+    # 检查是否已点赞
+    existing = CommentLike.query.filter_by(comment_id=comment_id, user_id=user_id).first()
+    if existing:
+        return jsonify({'message': '已点赞'}), 400
+    
+    # 添加点赞
+    like = CommentLike(comment_id=comment_id, user_id=user_id)
+    comment.like_count = (comment.like_count or 0) + 1
+    db.session.add(like)
+    db.session.commit()
+    
+    return jsonify({'message': '点赞成功', 'like_count': comment.like_count}), 201
+
+@app.route('/api/comments/<int:comment_id>/like', methods=['DELETE'])
+@jwt_required()
+def unlike_comment(comment_id):
+    """取消点赞"""
+    user_id = int(get_jwt_identity())
+    like = CommentLike.query.filter_by(comment_id=comment_id, user_id=user_id).first()
+    
+    if not like:
+        return jsonify({'message': '未点赞'}), 404
+    
+    comment = Comment.query.get_or_404(comment_id)
+    comment.like_count = max((comment.like_count or 0) - 1, 0)
+    db.session.delete(like)
+    db.session.commit()
+    
+    return jsonify({'message': '取消点赞成功', 'like_count': comment.like_count})
+
+# ==================== 认领相关API ====================
+
+@app.route('/api/items/<int:item_id>/claim', methods=['POST'])
+@jwt_required()
+def create_claim(item_id):
+    """创建认领申请（支持图片上传）"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if getattr(user, 'is_banned', False):
+        return jsonify({'message': '账户已被封禁，无法认领'}), 403
+    
+    item = Item.query.get_or_404(item_id)
+    
+    # 不能认领自己的物品
+    if item.user_id == user_id:
+        return jsonify({'message': '不能认领自己发布的物品'}), 400
+    
+    # 检查是否已有待处理的认领
+    existing = Claim.query.filter_by(
+        item_id=item_id,
+        claimant_id=user_id,
+        status='pending'
+    ).first()
+    
+    if existing:
+        return jsonify({'message': '已有待处理的认领申请'}), 400
+    
+    # 获取表单数据（支持JSON和FormData）
+    if request.is_json:
+        data = request.json
+        description = data.get('description', '').strip()
+        image_paths = []
+    else:
+        # FormData格式
+        description = request.form.get('description', '').strip()
+        image_paths = []
+        
+        # 处理上传的图片（支持多张）
+        if 'images' in request.files:
+            files = request.files.getlist('images')
+            for file in files:
+                if file and file.filename and allowed_file(file.filename):
+                    import time
+                    import random
+                    import string
+                    timestamp = int(time.time() * 1000)
+                    random_suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+                    original_filename = file.filename
+                    ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'jpg'
+                    filename = secure_filename(f"claim_{timestamp}_{random_suffix}.{ext}")
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    image_paths.append(filename)
+    
+    # 保存图片路径（JSON格式，统一保存为数组）
+    image_path_json = None
+    if image_paths:
+        import json
+        image_path_json = json.dumps(image_paths)  # 统一保存为JSON数组格式
+    
+    claim = Claim(
+        item_id=item_id,
+        claimant_id=user_id,
+        owner_id=item.user_id,
+        description=description,
+        image_path=image_path_json,
+        status='pending'
+    )
+    
+    db.session.add(claim)
+    db.session.commit()
+    
+    # 创建通知给发布者
+    create_notification(
+        item.user_id,
+        '认领申请',
+        f'{user.username} 申请认领你的{item.category == "lost" and "失物" or "拾物"}《{item.title}》',
+        'warning',
+        item_id
+    )
+    
+    return jsonify(claim.to_dict()), 201
+
+@app.route('/api/items/<int:item_id>/claims', methods=['GET'])
+@jwt_required()
+def get_item_claims(item_id):
+    """获取物品的认领列表（仅发布者可见）"""
+    user_id = int(get_jwt_identity())
+    item = Item.query.get_or_404(item_id)
+    
+    # 只有发布者可以查看认领列表
+    if item.user_id != user_id:
+        return jsonify({'message': '无权限查看'}), 403
+    
+    claims = Claim.query.filter_by(item_id=item_id)\
+        .order_by(Claim.created_at.desc()).all()
+    
+    return jsonify([claim.to_dict() for claim in claims])
+
+@app.route('/api/claims/<int:claim_id>/approve', methods=['PUT'])
+@jwt_required()
+def approve_claim(claim_id):
+    """批准认领"""
+    user_id = int(get_jwt_identity())
+    claim = Claim.query.get_or_404(claim_id)
+    item = Item.query.get_or_404(claim.item_id)
+    
+    # 只有发布者可以批准
+    if item.user_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    if claim.status != 'pending':
+        return jsonify({'message': '认领状态不正确'}), 400
+    
+    # 更新认领状态
+    claim.status = 'approved'
+    claim.updated_at = datetime.now()
+    
+    # 更新物品状态为已解决
+    item.status = 'closed'
+    
+    # 拒绝其他待处理的认领
+    Claim.query.filter_by(
+        item_id=claim.item_id,
+        status='pending'
+    ).filter(Claim.id != claim_id).update({'status': 'rejected'})
+    
+    db.session.commit()
+    
+    # 创建通知给认领人
+    create_notification(
+        claim.claimant_id,
+        '认领成功',
+        f'你的认领申请已通过！物品《{item.title}》已确认为你的{item.category == "lost" and "失物" or "拾物"}。',
+        'success',
+        claim.item_id
+    )
+    
+    # 创建通知给发布者
+    create_notification(
+        item.user_id,
+        '认领完成',
+        f'物品《{item.title}》已被认领，状态已更新为已解决。',
+        'success',
+        claim.item_id
+    )
+    
+    return jsonify(claim.to_dict())
+
+@app.route('/api/claims/<int:claim_id>/reject', methods=['PUT'])
+@jwt_required()
+def reject_claim(claim_id):
+    """拒绝认领"""
+    user_id = int(get_jwt_identity())
+    claim = Claim.query.get_or_404(claim_id)
+    item = Item.query.get_or_404(claim.item_id)
+    
+    # 只有发布者可以拒绝
+    if item.user_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    if claim.status != 'pending':
+        return jsonify({'message': '认领状态不正确'}), 400
+    
+    claim.status = 'rejected'
+    claim.updated_at = datetime.now()
+    db.session.commit()
+    
+    # 创建通知给认领人
+    create_notification(
+        claim.claimant_id,
+        '认领被拒绝',
+        f'你的认领申请未通过。物品《{item.title}》的认领申请已被拒绝。',
+        'warning',
+        claim.item_id
+    )
+    
+    return jsonify(claim.to_dict())
+
+@app.route('/api/my-claims', methods=['GET'])
+@jwt_required()
+def get_my_claims():
+    """获取我的认领记录"""
+    user_id = int(get_jwt_identity())
+    status = request.args.get('status', '')
+    
+    query = Claim.query.filter_by(claimant_id=user_id)
+    if status:
+        query = query.filter_by(status=status)
+    
+    claims = query.order_by(Claim.created_at.desc()).all()
+    
+    result = []
+    for claim in claims:
+        claim_dict = claim.to_dict()
+        claim_dict['item'] = claim.item.to_dict() if claim.item else None
+        result.append(claim_dict)
+    
+    return jsonify(result)
+
+@app.route('/api/pending-claims', methods=['GET'])
+@jwt_required()
+def get_pending_claims():
+    """获取所有认领申请（仅发布者可见，支持状态筛选）"""
+    user_id = int(get_jwt_identity())
+    status = request.args.get('status', '')  # 空字符串表示获取所有状态
+    
+    # 获取该用户发布的所有物品的认领申请
+    query = Claim.query.join(Item).filter(Item.user_id == user_id)
+    
+    # 如果指定了状态，则筛选
+    if status:
+        query = query.filter(Claim.status == status)
+    
+    claims = query.order_by(Claim.created_at.desc()).all()
+    
+    result = []
+    for claim in claims:
+        claim_dict = claim.to_dict()
+        claim_dict['item'] = claim.item.to_dict() if claim.item else None
+        result.append(claim_dict)
+    
+    return jsonify(result)
+
+@app.route('/api/claims/<int:claim_id>/public', methods=['PUT'])
+@jwt_required()
+def toggle_claim_public(claim_id):
+    """切换认领记录的公开状态"""
+    user_id = int(get_jwt_identity())
+    claim = Claim.query.get_or_404(claim_id)
+    
+    # 只有认领人自己可以修改公开状态
+    if claim.claimant_id != user_id:
+        return jsonify({'message': '无权限操作'}), 403
+    
+    data = request.json
+    is_public = data.get('is_public', False)
+    
+    claim.is_public = bool(is_public)
+    db.session.commit()
+    
+    return jsonify({
+        'message': '操作成功',
+        'is_public': claim.is_public
+    })
+
+@app.route('/api/users/<int:user_id>/public-claims', methods=['GET'])
+def get_user_public_claims(user_id):
+    """获取用户公开的认领历史记录"""
+    user = User.query.get_or_404(user_id)
+    
+    # 只返回已批准且公开的认领记录
+    claims = Claim.query.filter_by(
+        claimant_id=user_id,
+        status='approved',
+        is_public=True
+    ).order_by(Claim.created_at.desc()).all()
+    
+    result = []
+    for claim in claims:
+        claim_dict = claim.to_dict()
+        claim_dict['item'] = claim.item.to_dict() if claim.item else None
+        # 隐藏敏感信息，只显示基本信息
+        claim_dict['description'] = None  # 不显示认领说明
+        claim_dict['image_urls'] = []  # 不显示证据图片
+        result.append(claim_dict)
+    
+    return jsonify(result)
+
+# ==================== 匹配推荐API ====================
+
+@app.route('/api/items/<int:item_id>/matches', methods=['GET'])
+def get_matched_items(item_id):
+    """获取匹配的物品推荐"""
+    item = Item.query.get_or_404(item_id)
+    
+    # 匹配逻辑：寻找相反类型的物品（失物匹配拾物，拾物匹配失物）
+    opposite_category = 'found' if item.category == 'lost' else 'lost'
+    
+    # 基础查询：相同类型、相同地点、状态为进行中
+    matches = Item.query.filter(
+        Item.category == opposite_category,
+        Item.status == 'open',
+        Item.id != item_id
+    )
+    
+    # 按类型匹配
+    if item.item_type:
+        type_matches = matches.filter(Item.item_type == item.item_type).all()
+    else:
+        type_matches = []
+    
+    # 按地点匹配（包含相同关键词）
+    location_matches = []
+    if item.location:
+        location_keywords = item.location.split()
+        for keyword in location_keywords:
+            if len(keyword) > 1:  # 忽略单字
+                location_matches.extend(
+                    matches.filter(Item.location.contains(keyword)).all()
+                )
+    
+    # 按描述关键词匹配
+    description_matches = []
+    if item.description:
+        # 提取关键词（简单实现，可以改进）
+        desc_keywords = item.description.split()
+        for keyword in desc_keywords:
+            if len(keyword) > 2:  # 只匹配长度大于2的词
+                description_matches.extend(
+                    matches.filter(
+                        (Item.description.contains(keyword)) |
+                        (Item.title.contains(keyword))
+                    ).all()
+                )
+    
+    # 合并并去重
+    all_matches = {}
+    match_scores = {}
+    
+    # 类型匹配得分最高（3分）
+    for match in type_matches:
+        if match.id not in all_matches:
+            all_matches[match.id] = match
+            match_scores[match.id] = 3
+    
+    # 地点匹配（2分）
+    for match in location_matches:
+        if match.id not in all_matches:
+            all_matches[match.id] = match
+            match_scores[match.id] = 2
+        elif match_scores.get(match.id, 0) < 2:
+            match_scores[match.id] = 2
+    
+    # 描述匹配（1分）
+    for match in description_matches:
+        if match.id not in all_matches:
+            all_matches[match.id] = match
+            match_scores[match.id] = 1
+        elif match_scores.get(match.id, 0) < 1:
+            match_scores[match.id] = 1
+    
+    # 按得分排序，返回前5个
+    sorted_matches = sorted(
+        all_matches.values(),
+        key=lambda x: match_scores.get(x.id, 0),
+        reverse=True
+    )[:5]
+    
+    return jsonify([match.to_dict() for match in sorted_matches])
 
 @app.route('/api/conversations', methods=['GET'])
 @jwt_required()

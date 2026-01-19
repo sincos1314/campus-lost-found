@@ -31,6 +31,41 @@
       </h2>
     </div>
 
+    <!-- 公开的认领历史 -->
+    <el-card v-if="publicClaims.length > 0" class="claims-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <el-icon><Trophy /></el-icon>
+          <span>认领历史 ({{ publicClaims.length }})</span>
+        </div>
+      </template>
+      <div class="claims-list">
+        <div
+          v-for="claim in publicClaims"
+          :key="claim.id"
+          class="claim-item"
+          @click="goToItem(claim.item_id)"
+        >
+          <div class="claim-header">
+            <div class="claim-item-info">
+              <span class="claim-item-title">{{ claim.item?.title || '物品已删除' }}</span>
+              <el-tag
+                :type="claim.item?.category === 'lost' ? 'danger' : 'success'"
+                size="small"
+              >
+                {{ claim.item?.category === 'lost' ? '失物' : '拾物' }}
+              </el-tag>
+            </div>
+            <el-tag type="success" size="small">已批准</el-tag>
+          </div>
+          <div class="claim-time">
+            <el-icon><Clock /></el-icon>
+            {{ formatTime(claim.created_at) }}
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <el-empty v-if="!loading && items.length === 0" :description="emptyText" />
 
     <el-row :gutter="20" v-else>
@@ -67,7 +102,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request, { absoluteUrl, previewList } from '../utils/request'
 import { getToken } from '../utils/auth'
-import { Refresh, Picture, User } from '@element-plus/icons-vue'
+import { Refresh, Picture, User, Trophy, Clock } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,6 +115,7 @@ const pageSize = ref(8)
 const loading = ref(false)
 const emptyText = ref('暂无数据')
 const filters = ref({ category: '', status: '' })
+const publicClaims = ref([])
 
 const loadItems = async () => {
   loading.value = true
@@ -99,8 +135,43 @@ const loadItems = async () => {
   }
 }
 
+// 加载公开的认领历史
+const loadPublicClaims = async () => {
+  try {
+    publicClaims.value = await request.get(`/users/${userId}/public-claims`)
+  } catch (error) {
+    // 如果用户没有公开的认领记录或接口不存在，忽略错误
+    console.log('加载公开认领历史失败或用户未公开:', error)
+    publicClaims.value = []
+  }
+}
+
+// 格式化时间
+const formatTime = (timeStr) => {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = now - date
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days > 0) {
+    return `${days}天前`
+  }
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  if (hours > 0) {
+    return `${hours}小时前`
+  }
+  const minutes = Math.floor(diff / (1000 * 60))
+  if (minutes > 0) {
+    return `${minutes}分钟前`
+  }
+  return '刚刚'
+}
+
+const goToItem = (itemId) => {
+  router.push(`/item/${itemId}`)
+}
+
 const onPageChange = (p) => { page.value = p; loadItems() }
-const goToDetail = (id) => router.push(`/item/${id}`)
 
 // 获取物品的图片URL（支持多张图片）
 const getItemImageUrl = (item) => {
@@ -219,5 +290,71 @@ loadItems()
 .filter-card :deep(.el-button:hover) {
   transform: translateY(-2px) translateX(-2px);
   box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+/* 认领历史卡片 */
+.claims-card {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.claims-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.claim-item {
+  padding: 1rem;
+  background: var(--color-primary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.claim-item:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.claim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.claim-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.claim-item-title {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.claim-time {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 </style>

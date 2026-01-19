@@ -249,6 +249,15 @@ onMounted(() => {
   color: #909399;
 }
 
+.notification-footer :deep(.el-button--primary.is-link) {
+  color: #409EFF !important;
+  font-weight: 600;
+}
+
+.notification-footer :deep(.el-button--primary.is-link:hover) {
+  color: #66b1ff !important;
+}
+
 .notification-status {
   flex-shrink: 0;
 }

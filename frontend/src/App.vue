@@ -49,12 +49,39 @@
             </button>
             <button 
               class="nav-link"
+              :class="{ active: isActiveRoute('/my-favorites') }"
+              @click="goToMyFavorites"
+              v-if="isLoggedInComputed"
+            >
+              <el-icon><Star /></el-icon>
+              我的收藏
+            </button>
+            <button 
+              class="nav-link"
               :class="{ active: isActiveRoute('/my-reports') }"
               @click="goToMyReports"
               v-if="isLoggedInComputed"
             >
               <el-icon><Warning /></el-icon>
               我的举报
+            </button>
+            <button 
+              class="nav-link"
+              :class="{ active: isActiveRoute('/my-claims') }"
+              @click="goToMyClaims"
+              v-if="isLoggedInComputed"
+            >
+              <el-icon><Trophy /></el-icon>
+              我的认领
+            </button>
+            <button 
+              class="nav-link"
+              :class="{ active: isActiveRoute('/claim-management') }"
+              @click="goToClaimManagement"
+              v-if="isLoggedInComputed"
+            >
+              <el-icon><DocumentChecked /></el-icon>
+              认领管理
             </button>
             <button 
               class="nav-link"
@@ -65,21 +92,6 @@
               <el-icon><DataAnalysis /></el-icon>
               数据看板
             </button>
-          </div>
-
-          <div class="search-section">
-            <div class="search-wrapper">
-              <el-input
-                v-model="keyword"
-                placeholder="搜索物品关键词"
-                clearable
-                class="search-input"
-                @keyup.enter="doSearch"
-              />
-              <button class="search-button" @click="doSearch">
-                <el-icon><Search /></el-icon>
-              </button>
-            </div>
           </div>
 
           <!-- 用户区域 -->
@@ -144,7 +156,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { isLoggedIn, getUser, removeToken } from './utils/auth'
-import { Compass, User, Bell, ArrowDown, ChatDotRound, Search, Moon, Sunny, Plus, DataAnalysis, Present, FolderOpened, Warning } from '@element-plus/icons-vue'
+import { Compass, User, Bell, ArrowDown, ChatDotRound, Search, Moon, Sunny, Plus, DataAnalysis, Present, FolderOpened, Warning, Star, Trophy, DocumentChecked } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from './utils/request'
 
@@ -154,7 +166,6 @@ const route = useRoute()
 const user = ref(null)
 const unreadCount = ref(0)
 const unreadMessageCount = ref(0) // 新增：未读私信数
-const keyword = ref('')
 const darkMode = ref(false)
 
 // 活动菜单项
@@ -252,6 +263,30 @@ const goToMyReports = () => {
   }
   router.push('/my-reports')
 }
+const goToMyClaims = () => {
+  if (!isLoggedIn()) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  router.push('/my-claims')
+}
+const goToClaimManagement = () => {
+  if (!isLoggedIn()) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  router.push('/claim-management')
+}
+const goToMyFavorites = () => {
+  if (!isLoggedIn()) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  router.push('/my-favorites')
+}
 const goToDashboard = () => {
   if (!isLoggedIn()) {
     ElMessage.warning('请先登录')
@@ -264,15 +299,6 @@ const goToDashboard = () => {
 // 检查路由是否激活
 const isActiveRoute = (path) => {
   return route.path.startsWith(path)
-} 
-const doSearch = () => {
-  const q = keyword.value.trim()
-  if (!q) return
-  if (route.name === 'list' && route.params.category) {
-    router.push({ name: 'list', params: { category: route.params.category }, query: { search: q } })
-  } else {
-    router.push({ name: 'list', params: { category: 'lost' }, query: { search: q } })
-  }
 }
 const toggleDarkMode = () => {
   darkMode.value = !darkMode.value
@@ -440,81 +466,6 @@ onMounted(() => {
   box-shadow: 2px 2px 0px 0px var(--shadow-color);
 }
 
-/* 搜索区域 */
-.search-section {
-  flex: 0 0 250px;
-  min-width: 0;
-}
-
-/* 搜索框包装器 - 输入框和按钮连在一起 */
-.search-wrapper {
-  display: flex;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
-  overflow: hidden;
-  background: var(--color-card);
-}
-
-/* 移除 Element Plus 默认的输入框包装器样式 */
-.search-input {
-  flex: 1;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.search-input :deep(.el-input) {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.search-input :deep(.el-input__wrapper) {
-  border: none !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0.5rem 1rem !important;
-}
-
-.search-input :deep(.el-input__inner) {
-  border: none !important;
-  background: transparent !important;
-  color: var(--color-text) !important;
-  font-weight: 700 !important;
-  font-size: 0.9rem !important;
-}
-
-.search-input :deep(.el-input__wrapper.is-focus) {
-  box-shadow: none !important;
-}
-
-.search-wrapper:focus-within {
-  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color) !important;
-}
-
-/* 搜索按钮 */
-.search-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 45px;
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-left: var(--border-width) solid var(--border-color);
-  cursor: pointer;
-  transition: background 0.15s ease;
-  font-size: 1.2rem;
-  padding: 0;
-}
-
-.search-button:hover {
-  background: #2563eb;
-}
-
-.search-button:active {
-  background: #1d4ed8;
-}
 
 /* 用户区域 */
 .user-section {
@@ -616,10 +567,6 @@ onMounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .search-section {
-    flex: 0 0 200px;
-  }
-  
   .nav-link {
     padding: 0.5rem 0.8rem;
     font-size: 0.85rem;
@@ -627,10 +574,6 @@ onMounted(() => {
 }
 
 @media (max-width: 1024px) {
-  .search-section {
-    flex: 0 0 180px;
-  }
-  
   .nav-link {
     padding: 0.4rem 0.7rem;
     font-size: 0.8rem;
@@ -658,10 +601,6 @@ onMounted(() => {
   .logo-icon {
     width: 32px;
     height: 32px;
-  }
-  
-  .search-section {
-    display: none;
   }
   
   .nav-link {
