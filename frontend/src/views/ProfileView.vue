@@ -4,7 +4,7 @@
       <el-col :xs="24" :md="8">
         <el-card class="user-card card-glass hover-rise" shadow="never">
           <div class="user-avatar">
-            <el-avatar :size="100" :src="user?.avatar_url ? `http://localhost:5000${user.avatar_url}` : ''">
+            <el-avatar :size="100" :src="user?.avatar_url ? absoluteUrl(user.avatar_url) : ''">
               <el-icon v-if="!user?.avatar_url" :size="50"><User /></el-icon>
             </el-avatar>
           </div>
@@ -13,7 +13,7 @@
           <p class="join-date">当前年级：{{ user?.grade_display || user?.grade || '未设置' }}</p>
           <el-upload
             class="avatar-uploader"
-            :action="'http://localhost:5000/api/auth/avatar'"
+            :action="'/api/auth/avatar'"
             :headers="{ Authorization: `Bearer ${token}` }"
             name="avatar"
             :show-file-list="false"

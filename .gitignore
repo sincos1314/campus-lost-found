@@ -8,6 +8,9 @@ backend/.env
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+frontend/.env.production
+frontend/.env.development
+frontend/.env.local
 
 deploy/
 

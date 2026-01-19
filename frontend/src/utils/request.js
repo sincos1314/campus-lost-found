@@ -3,7 +3,9 @@ import { getToken, removeToken } from './auth'
 import { ElMessage } from 'element-plus'
 import router from '../router'
 
-const API_ORIGIN = import.meta.env.VITE_API_BASE || `http://${location.hostname}:5000`
+// 开发环境使用 localhost:5000，生产环境使用相对路径（空字符串）
+// 如果设置了 VITE_API_BASE 环境变量，则优先使用环境变量
+const API_ORIGIN = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? `http://${location.hostname}:5000` : '')
 const request = axios.create({
   baseURL: `${API_ORIGIN}/api`,
   timeout: 10000

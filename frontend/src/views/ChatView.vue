@@ -97,7 +97,7 @@
       <!-- 输入区域 -->
       <div class="input-area">
         <el-upload
-          :action="`${apiOrigin}/api/conversations/${conversationId}/send-image`"
+          :action="`/api/conversations/${conversationId}/send-image`"
           :headers="{ Authorization: `Bearer ${getToken()}` }"
           name="image"
           :show-file-list="false"
@@ -346,7 +346,9 @@ const initWebSocket = () => {
   if (!token) return;
 
   // 连接WebSocket服务器
-  socket.value = io(import.meta.env.VITE_SOCKET_ORIGIN || apiOrigin, {
+  // 开发环境使用 localhost:5000，生产环境使用当前域名
+  const socketOrigin = import.meta.env.VITE_SOCKET_ORIGIN || (import.meta.env.DEV ? `http://${location.hostname}:5000` : window.location.origin)
+  socket.value = io(socketOrigin, {
     query: { token }
   });
 

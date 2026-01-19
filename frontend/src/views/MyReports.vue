@@ -390,7 +390,8 @@ const submitEdit = async () => {
     
     // 更新图片 - 使用原生 axios 发送 FormData
     const token = getToken()
-    const API_ORIGIN = apiOrigin || `http://${location.hostname}:5000`
+    // 开发环境使用 localhost:5000，生产环境使用相对路径
+    const API_ORIGIN = apiOrigin || (import.meta.env.DEV ? `http://${location.hostname}:5000` : '')
     
     // 创建一个新的 axios 实例，确保不会受到任何拦截器影响
     const axiosInstance = axios.create({
@@ -417,7 +418,8 @@ const submitEdit = async () => {
     // 如果所有图片都被删除了，需要清空图片
     const formData = new FormData()
     const token = getToken()
-    const API_ORIGIN = apiOrigin || `http://${location.hostname}:5000`
+    // 开发环境使用 localhost:5000，生产环境使用相对路径
+    const API_ORIGIN = apiOrigin || (import.meta.env.DEV ? `http://${location.hostname}:5000` : '')
     
     // 创建一个新的 axios 实例
     const axiosInstance = axios.create({
@@ -642,7 +644,8 @@ const uploadEvidenceImage = async (imageItem) => {
     
     // 使用原生 axios 发送 FormData，确保 Content-Type 正确
     const token = getToken()
-    const API_ORIGIN = apiOrigin || `http://${location.hostname}:5000`
+    // 开发环境使用 localhost:5000，生产环境使用相对路径
+    const API_ORIGIN = apiOrigin || (import.meta.env.DEV ? `http://${location.hostname}:5000` : '')
     
     console.log('[DEBUG] 准备上传图片，FormData 内容:')
     for (let pair of formData.entries()) {
@@ -838,7 +841,8 @@ const removeEvidenceImage = async (index) => {
       })
       
       const token = getToken()
-      const API_ORIGIN = apiOrigin || `http://${location.hostname}:5000`
+      // 开发环境使用 localhost:5000，生产环境使用相对路径
+    const API_ORIGIN = apiOrigin || (import.meta.env.DEV ? `http://${location.hostname}:5000` : '')
       
       // 创建一个新的 axios 实例
       const axiosInstance = axios.create({
