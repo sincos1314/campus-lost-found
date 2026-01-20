@@ -353,6 +353,18 @@ const handleSubmit = async () => {
       router.push(`/list/${form.category}`)
     } catch (error) {
       console.error('发布失败:', error)
+      const errorData = error?.response?.data || {}
+      const msg = errorData.message || '发布失败，请重试'
+      
+      // 如果是敏感词错误，显示详细信息
+      if (errorData.sensitive_words && errorData.sensitive_words.length > 0) {
+        ElMessage.error({
+          message: msg,
+          duration: 5000
+        })
+      } else {
+        ElMessage.error(msg)
+      }
     } finally {
       loading.value = false
     }

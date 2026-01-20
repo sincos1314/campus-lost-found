@@ -45,6 +45,30 @@
         <p>查看平台基本统计数据</p>
       </div>
       <el-tabs v-model="tab">
+        <el-tab-pane label="教师审核" name="teachers" v-if="isAdmin && meLevel === 'high'">
+          <el-table :data="pendingTeachers" style="width: 100%">
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="username" label="用户名" />
+            <el-table-column prop="email" label="邮箱" />
+            <el-table-column prop="staff_id" label="工号" />
+            <el-table-column prop="department" label="院系" />
+            <el-table-column prop="created_at" label="注册时间" />
+            <el-table-column label="操作" width="200">
+              <template #default="{ row }">
+                <el-button
+                  size="small"
+                  type="success"
+                  @click="approveTeacher(row)"
+                >批准</el-button>
+                <el-button
+                  size="small"
+                  type="danger"
+                  @click="rejectTeacher(row)"
+                >拒绝</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
         <el-tab-pane label="用户" name="users" v-if="isAdmin">
           <el-table :data="usersPaged" style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
@@ -594,7 +618,7 @@ import { ref, onMounted, watch, computed, nextTick } from "vue";
 import request, { absoluteUrl, previewList, previewListMultiple } from "../utils/request";
 import { getUser } from "../utils/auth";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 const router = useRouter();
 const tab = ref("users");
@@ -602,6 +626,7 @@ const users = ref([]);
 const items = ref([]);
 const reports = ref([]);
 const stats = ref({});
+const pendingTeachers = ref([]);
 const keyword = ref("");
 const reportStatus = ref("");
 const itemStatus = ref("");
@@ -731,6 +756,9 @@ const filteredStats = computed(() => {
 const load = async () => {
   try {
     if (isAdmin.value) {
+      if (tab.value === "teachers" && meLevel === "high") {
+        pendingTeachers.value = await request.get("/admin/teachers/pending");
+      }
       if (tab.value === "users") users.value = await request.get("/admin/users");
       if (tab.value === "items") items.value = await request.get("/admin/items");
       if (tab.value === "reports")
@@ -784,6 +812,39 @@ const updateItemStatus = async (row, status) => {
   await request.put(`/admin/items/${row.id}/status`, { status });
   await load();
 };
+const approveTeacher = async (teacher) => {
+  try {
+    await request.post(`/admin/teachers/${teacher.id}/approve`)
+    ElMessage.success('已批准教师注册')
+    await load()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '操作失败')
+  }
+}
+
+const rejectTeacher = async (teacher) => {
+  try {
+    await ElMessageBox.prompt('请输入拒绝原因（可选）', '拒绝教师注册', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '拒绝原因...'
+    }).then(async ({ value }) => {
+      await request.post(`/admin/teachers/${teacher.id}/reject`, {
+        reason: value || ''
+      })
+      ElMessage.success('已拒绝教师注册')
+      await load()
+    }).catch(() => {
+      // 用户取消
+    })
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || '操作失败')
+    }
+  }
+}
+
 const updateReportStatus = async (row, status = null) => {
   // 使用传入的 status 参数，如果没有则使用 row.status
   const targetStatus = status !== null ? status : row.status;

@@ -37,6 +37,37 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
+# 敏感词列表（中英文）
+SENSITIVE_WORDS = [
+    # 中文敏感词
+    '傻逼', '傻B', 'SB', '草泥马', '操你妈', '你妈', '他妈的', '妈的', '卧槽', '我靠',
+    '滚', '去死', '死', '杀', '砍', '打', '揍', '干', '操', '日', '艹',
+    '垃圾', '废物', '白痴', '智障', '脑残', '弱智', '蠢货', '笨蛋',
+    '骗子', '诈骗', '坑', '骗', '偷', '抢', '盗',
+    '色情', '黄色', '性', '做爱', '性爱', '淫', '骚', '贱',
+    '政治', '政府', '党', '国家', '领导人',
+    # 英文敏感词
+    'fuck', 'shit', 'damn', 'bitch', 'ass', 'asshole', 'bastard', 'crap',
+    'stupid', 'idiot', 'moron', 'retard', 'dumb', 'fool',
+    'kill', 'die', 'death', 'murder', 'suicide',
+    'sex', 'porn', 'pornography', 'nude', 'naked', 'erotic',
+    'drug', 'cocaine', 'heroin', 'marijuana',
+    'hate', 'violence', 'terror', 'terrorist',
+    # 其他
+    'spam', 'scam', 'fraud', 'cheat', 'steal', 'rob'
+]
+
+def contains_sensitive_words(text):
+    """检查文本是否包含敏感词"""
+    if not text:
+        return False, []
+    text_lower = text.lower()
+    found_words = []
+    for word in SENSITIVE_WORDS:
+        if word.lower() in text_lower:
+            found_words.append(word)
+    return len(found_words) > 0, found_words
+
 # 添加错误处理器来捕获 415 错误和其他错误
 @app.errorhandler(415)
 def unsupported_media_type(error):
@@ -82,6 +113,7 @@ class User(db.Model):
     banned_by = db.Column(db.Integer)
     user_type = db.Column(db.String(20))  # 学生/教师
     staff_id = db.Column(db.String(50))   # 工号（教师）
+    teacher_approval_status = db.Column(db.String(20), default='approved')  # 教师审核状态: pending/approved/rejected
     visibility_setting = db.Column(db.String(20), default='public')
     others_policy = db.Column(db.String(20), default='show')
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -152,6 +184,7 @@ class User(db.Model):
             'banned_by': self.banned_by,
             'user_type': self.user_type,
             'staff_id': self.staff_id,
+            'teacher_approval_status': self.teacher_approval_status or 'approved',
             'visibility_setting': self.visibility_setting,
             'others_policy': self.others_policy,
             'grade_display': compute_grade_display(),
@@ -497,6 +530,7 @@ with app.app_context():
             ('banned_by', 'INTEGER'),
             ('user_type', 'TEXT'),
             ('staff_id', 'TEXT'),
+            ('teacher_approval_status', 'TEXT'),
             ('visibility_setting', 'TEXT'),
             ('others_policy', 'TEXT')
         ]:
@@ -735,24 +769,44 @@ def register():
         staff_id=data.get('staff_id', '')
     )
     user.set_password(data['password'])
-    # 教师自动授予中级管理员
+    
+    # 教师需要审核，学生直接通过
     if identity == 'teacher':
-        user.role = 'admin'
-        user.admin_level = 'mid'
+        user.role = 'user'  # 先设为普通用户
+        user.admin_level = None
         user.admin_appointed_by = None
+        user.teacher_approval_status = 'pending'  # 待审核
+    else:
+        user.teacher_approval_status = 'approved'  # 学生直接通过
     
     db.session.add(user)
     db.session.commit()
     
-    # 创建欢迎通知
-    create_notification(
-        user.id,
-        '欢迎加入校园失物招领系统！',
-        f'你好 {user.username}，欢迎使用我们的系统。你可以在这里发布和查找失物信息。',
-        'success'
-    )
-    
-    return jsonify({'message': '注册成功', 'user': user.to_dict()}), 201
+    # 如果是教师，通知高级管理员审核
+    if identity == 'teacher':
+        # 查找所有高级管理员
+        high_admins = User.query.filter_by(role='admin', admin_level='high').all()
+        for admin in high_admins:
+            create_notification(
+                admin.id,
+                '新教师注册待审核',
+                f'教师 {user.username} ({user.email}) 申请注册，请前往管理员页面审核。',
+                'warning'
+            )
+        return jsonify({
+            'message': '注册成功，您的账户正在等待管理员审核，审核通过后即可使用',
+            'user': user.to_dict(),
+            'requires_approval': True
+        }), 201
+    else:
+        # 学生直接创建欢迎通知
+        create_notification(
+            user.id,
+            '欢迎加入校园失物招领系统！',
+            f'你好 {user.username}，欢迎使用我们的系统。你可以在这里发布和查找失物信息。',
+            'success'
+        )
+        return jsonify({'message': '注册成功', 'user': user.to_dict()}), 201
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -762,6 +816,19 @@ def login():
     
     if not user or not user.check_password(data['password']):
         return jsonify({'message': '用户名或密码错误'}), 401
+    
+    # 检查教师审核状态
+    if user.user_type == 'teacher' and user.teacher_approval_status == 'pending':
+        return jsonify({
+            'message': '您的账户正在等待管理员审核，审核通过后即可登录',
+            'requires_approval': True
+        }), 403
+    
+    if user.user_type == 'teacher' and user.teacher_approval_status == 'rejected':
+        return jsonify({
+            'message': '您的注册申请已被拒绝，如有疑问请联系管理员',
+            'approval_rejected': True
+        }), 403
     
     access_token = create_access_token(identity=str(user.id))
     return jsonify({
@@ -1120,6 +1187,16 @@ def create_item():
     if getattr(user, 'is_banned', False):
         return jsonify({'message': '账户已被封禁，无法发布'}), 403
     data = request.form.to_dict()
+    
+    # 敏感词检查
+    title = data.get('title', '')
+    description = data.get('description', '')
+    has_sensitive, found_words = contains_sensitive_words(title + ' ' + description)
+    if has_sensitive:
+        return jsonify({
+            'message': f'发布内容包含敏感词，请修改后再发布。检测到的敏感词：{", ".join(found_words[:3])}',
+            'sensitive_words': found_words
+        }), 400
     
     # 处理多张图片上传
     image_paths = []
@@ -2112,6 +2189,97 @@ def admin_stats():
         'reports_open': Report.query.filter_by(status='open').count()
     })
 
+@app.route('/api/admin/teachers/pending', methods=['GET'])
+@jwt_required()
+def get_pending_teachers():
+    """获取待审核的教师列表（仅高级管理员）"""
+    current_admin = get_current_user()
+    if not admin_required() or current_admin.admin_level != 'high':
+        return jsonify({'message': 'forbidden'}), 403
+    
+    pending_teachers = User.query.filter_by(
+        user_type='teacher',
+        teacher_approval_status='pending'
+    ).order_by(User.created_at.desc()).all()
+    
+    return jsonify([user.to_dict() for user in pending_teachers])
+
+@app.route('/api/admin/teachers/<int:teacher_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_teacher(teacher_id):
+    """批准教师注册（仅高级管理员）"""
+    current_admin = get_current_user()
+    if not admin_required() or current_admin.admin_level != 'high':
+        return jsonify({'message': 'forbidden'}), 403
+    
+    teacher = User.query.get_or_404(teacher_id)
+    if teacher.user_type != 'teacher':
+        return jsonify({'message': '该用户不是教师'}), 400
+    
+    if teacher.teacher_approval_status != 'pending':
+        return jsonify({'message': '该教师已审核'}), 400
+    
+    # 批准：设置为管理员
+    teacher.teacher_approval_status = 'approved'
+    teacher.role = 'admin'
+    teacher.admin_level = 'mid'
+    teacher.admin_appointed_by = current_admin.id
+    
+    db.session.commit()
+    
+    # 通知教师审核通过
+    create_notification(
+        teacher.id,
+        '注册审核通过',
+        f'恭喜！您的教师账户已通过审核，现在可以使用系统了。',
+        'success'
+    )
+    
+    return jsonify({
+        'message': '审核通过',
+        'user': teacher.to_dict()
+    })
+
+@app.route('/api/admin/teachers/<int:teacher_id>/reject', methods=['POST'])
+@jwt_required()
+def reject_teacher(teacher_id):
+    """拒绝教师注册（仅高级管理员）"""
+    current_admin = get_current_user()
+    if not admin_required() or current_admin.admin_level != 'high':
+        return jsonify({'message': 'forbidden'}), 403
+    
+    teacher = User.query.get_or_404(teacher_id)
+    if teacher.user_type != 'teacher':
+        return jsonify({'message': '该用户不是教师'}), 400
+    
+    if teacher.teacher_approval_status != 'pending':
+        return jsonify({'message': '该教师已审核'}), 400
+    
+    data = request.json or {}
+    reason = data.get('reason', '')
+    
+    # 拒绝
+    teacher.teacher_approval_status = 'rejected'
+    teacher.role = 'user'  # 保持为普通用户
+    
+    db.session.commit()
+    
+    # 通知教师审核被拒绝
+    reject_msg = f'很抱歉，您的教师注册申请未通过审核。'
+    if reason:
+        reject_msg += f' 原因：{reason}'
+    create_notification(
+        teacher.id,
+        '注册审核未通过',
+        reject_msg,
+        'error'
+    )
+    
+    return jsonify({
+        'message': '已拒绝',
+        'user': teacher.to_dict()
+    })
+
 @app.route('/api/admin/users/create', methods=['POST'])
 @jwt_required()
 def admin_create_user():
@@ -3035,6 +3203,14 @@ def send_message(conversation_id):
     if not content:
         return jsonify({'message': '消息内容不能为空'}), 400
     
+    # 敏感词检查
+    has_sensitive, found_words = contains_sensitive_words(content)
+    if has_sensitive:
+        return jsonify({
+            'message': f'消息包含敏感词，请修改后再发送。检测到的敏感词：{", ".join(found_words[:3])}',
+            'sensitive_words': found_words
+        }), 400
+    
     # 确定接收者
     receiver_id = conversation.user2_id if conversation.user1_id == user_id else conversation.user1_id
     if getattr(user, 'is_banned', False) and (user.banned_by is None or receiver_id != user.banned_by):
@@ -3353,7 +3529,17 @@ def handle_send_message(data):
         
         conversation_id = data.get('conversation_id')
         receiver_id = data.get('receiver_id')
-        content = data.get('content')
+        content = data.get('content', '').strip()
+        
+        # 敏感词检查
+        if content:
+            has_sensitive, found_words = contains_sensitive_words(content)
+            if has_sensitive:
+                emit('error', {
+                    'message': f'消息包含敏感词，请修改后再发送。检测到的敏感词：{", ".join(found_words[:3])}',
+                    'sensitive_words': found_words
+                })
+                return
         
         # 创建消息记录（复用现有逻辑）
         message = Message(

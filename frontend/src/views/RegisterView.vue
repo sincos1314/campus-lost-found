@@ -28,6 +28,15 @@
         size="large"
       >
         <template v-if="identity==='teacher'">
+          <el-alert
+            type="info"
+            :closable="false"
+            style="margin-bottom: 20px"
+          >
+            <template #title>
+              <span>教师注册需要管理员审核，审核通过后即可使用系统</span>
+            </template>
+          </el-alert>
           <el-form-item label="工号" prop="staff_id">
             <el-input v-model="registerForm.staff_id" placeholder="请输入工号" />
           </el-form-item>
@@ -194,7 +203,7 @@ const handleRegister = async () => {
     
     loading.value = true
     try {
-      await request.post('/auth/register', {
+      const response = await request.post('/auth/register', {
         username: registerForm.username,
         email: registerForm.email,
         phone: registerForm.phone,
@@ -207,7 +216,12 @@ const handleRegister = async () => {
         identity: identity.value || 'student',
         staff_id: identity.value==='teacher' ? registerForm.staff_id : ''
       })
-      ElMessage.success('注册成功！请登录')
+      
+      if (response.requires_approval) {
+        ElMessage.success('注册成功！您的账户正在等待管理员审核，审核通过后即可登录使用')
+      } else {
+        ElMessage.success('注册成功！请登录')
+      }
       router.push('/login')
     } catch (error) {
       console.error('注册失败:', error)
