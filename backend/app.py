@@ -37,34 +37,98 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# 敏感词列表（中英文）
+# 敏感词列表（中英文）- 以多字词/短语为主，避免单字误伤（如曹操、日本、生日、干活、打球等）
 SENSITIVE_WORDS = [
-    # 中文敏感词
-    '傻逼', '傻B', 'SB', '草泥马', '操你妈', '你妈', '他妈的', '妈的', '卧槽', '我靠',
-    '滚', '去死', '死', '杀', '砍', '打', '揍', '干', '操', '日', '艹',
+    # 中文敏感词（短语优先，不含易误伤单字如操/日/干/打/死/杀/骗/偷/抢/盗/性/淫/骚/贱）
+    '傻逼', '傻B', 'SB', '草泥马', '操你妈', '操他妈', '你妈', '他妈的', '妈的', '卧槽', '我靠',
+    '滚', '去死', '打死', '杀人', '砍死', '揍你', '干你', '艹',
     '垃圾', '废物', '白痴', '智障', '脑残', '弱智', '蠢货', '笨蛋',
-    '骗子', '诈骗', '坑', '骗', '偷', '抢', '盗',
-    '色情', '黄色', '性', '做爱', '性爱', '淫', '骚', '贱',
+    '骗子', '诈骗', '坑人', '骗人', '偷窃', '抢劫', '盗窃', '强奸',
+    '色情', '黄色', '做爱', '性爱', '淫荡', '淫秽', '骚货', '贱人',
     '政治', '政府', '党', '国家', '领导人',
-    # 英文敏感词
-    'fuck', 'shit', 'damn', 'bitch', 'ass', 'asshole', 'bastard', 'crap',
+    # 英文敏感词（整词匹配，避免 skill 中含 kill 等误伤在下方逻辑中处理）
+    'fuck', 'shit', 'damn', 'bitch', 'asshole', 'bastard', 'crap',
     'stupid', 'idiot', 'moron', 'retard', 'dumb', 'fool',
     'kill', 'die', 'death', 'murder', 'suicide',
     'sex', 'porn', 'pornography', 'nude', 'naked', 'erotic',
     'drug', 'cocaine', 'heroin', 'marijuana',
     'hate', 'violence', 'terror', 'terrorist',
-    # 其他
     'spam', 'scam', 'fraud', 'cheat', 'steal', 'rob'
 ]
 
+# 安全词白名单：包含敏感字但为正常用语的词/短语，检测前会先替换为占位符，避免误伤
+# 按长度从长到短排序，先替换长短语再替换短词（如先“曹操”再“操”所在的其他安全词）
+SAFE_PHRASES = [
+    # 含“操”
+    '曹操', '操作', '体操', '操守', '操劳', '操持', '操办', '操场', '操练', '情操', '节操',
+    # 含“日”
+    '日本', '日期', '生日', '今日', '明日', '昨日', '节日', '假日', '星期日', '工作日', '日用', '日记', '日光', '日常', '日用品', '某日',
+    # 含“干”
+    '干活', '干净', '干杯', '饼干', '若干', '干扰', '干练', '干吗', '才干', '树干', '骨干', '包干', '晾干', '风干', '相干',
+    # 含“打”
+    '打球', '打字', '打工', '打扫', '打针', '打饭', '打包', '打车', '打水', '打开', '打算', '打听', '打扮', '打击', '打印', '打折', '打勾', '打杂', '打牌', '打游戏', '打电话',
+    # 含“死”（仅保留明显中性）
+    '生死', '死亡', '死活', '死心', '死党', '死结', '死胡同', '猝死', '生死线',
+    # 含“杀”（游戏/中性）
+    '杀菌', '杀毒', '杀青', '杀价', '杀气', '杀鸡', '杀鱼',
+    # 含“坑”
+    '坑道', '坑洼', '坑口', '矿坑', '泥坑', '坑坑洼洼',
+    # 含“骗”的少，不加；含“偷”“抢”“盗”的常见中性词
+    '偷懒', '偷看', '偷听', '偷袭', '抢购', '抢修', '抢收', '抢答', '盗版', '盗墓', '盗贼', '海盗', '盗窃案',
+    # 含“性”
+    '性别', '性格', '理性', '感性', '人性', '个性', '性质', '性能', '弹性', '惯性', '记性', '索性', '索性', '良性', '恶性', '中性',
+    # 含“淫”（书面/中性）
+    '淫雨', '淫威',
+    # 含“骚”
+    '骚动', '骚乱', '风骚', '离骚',
+    # 含“贱”
+    '贱卖', '贱价', '贵贱', '贫贱',
+    # 英文：ass 在 class、pass、glass 等中误伤，用整词匹配时已避免；kill 在 skill 等，用整词
+]
+# 按长度降序，优先替换更长短语
+SAFE_PHRASES_SORTED = sorted(SAFE_PHRASES, key=len, reverse=True)
+
+# 占位符：用于替换安全词，避免被敏感词匹配（使用零宽字符，不改变长度）
+def _placeholder(length):
+    return '\u200B' * length  # 零宽空格
+
+def _is_word_boundary(text, start, length):
+    """判断 start 处长度为 length 的子串是否为整词（前后非字母/数字）"""
+    if start > 0 and (text[start - 1].isalnum() or text[start - 1] == '_'):
+        return False
+    end = start + length
+    if end < len(text) and (text[end].isalnum() or text[end] == '_'):
+        return False
+    return True
+
 def contains_sensitive_words(text):
-    """检查文本是否包含敏感词"""
+    """检查文本是否包含敏感词（先屏蔽安全词白名单，再检测，减少误伤如曹操、操作、日本等）"""
     if not text:
         return False, []
-    text_lower = text.lower()
+    # 先对原文做安全词替换（仅用于检测的副本）
+    check_text = text
+    for phrase in SAFE_PHRASES_SORTED:
+        if phrase in check_text:
+            check_text = check_text.replace(phrase, _placeholder(len(phrase)))
+    # 再对替换后的文本做敏感词检测
+    check_lower = check_text.lower()
     found_words = []
     for word in SENSITIVE_WORDS:
-        if word.lower() in text_lower:
+        w_lower = word.lower()
+        if w_lower not in check_lower:
+            continue
+        # 英文敏感词要求整词匹配，避免误伤 skill(kill)、class(ass)、password(ass) 等
+        if word.isascii():
+            idx = 0
+            while True:
+                pos = check_lower.find(w_lower, idx)
+                if pos == -1:
+                    break
+                if _is_word_boundary(check_text, pos, len(word)):
+                    found_words.append(word)
+                    break
+                idx = pos + 1
+        else:
             found_words.append(word)
     return len(found_words) > 0, found_words
 
