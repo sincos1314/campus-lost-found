@@ -644,4 +644,87 @@ const onDateChange = () => {
   border-radius: var(--border-radius);
   font-weight: 600;
 }
+
+/* 移动端适配（约 6.59 英寸 / 2412*1080 逻辑宽约 393px） */
+@media (max-width: 480px) {
+  .list-container {
+    padding: 1rem;
+  }
+
+  .filter-card {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-card :deep(.el-row) {
+    margin-left: -8px !important;
+    margin-right: -8px !important;
+  }
+
+  .filter-card :deep(.el-col) {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .action-buttons :deep(.el-button) {
+    width: 100%;
+  }
+
+  .list-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .item-card {
+    margin-bottom: 1rem;
+  }
+
+  .item-image {
+    height: 160px;
+  }
+
+  .item-title {
+    font-size: 15px;
+  }
+
+  .item-description {
+    font-size: 13px;
+  }
+
+  .pagination-bar {
+    padding: 1rem 0;
+  }
+
+  .pagination-bar :deep(.el-pagination) {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .pagination-bar :deep(.el-pager li),
+  .pagination-bar :deep(.btn-prev),
+  .pagination-bar :deep(.btn-next) {
+    min-width: 36px;
+    height: 36px;
+    line-height: 36px;
+  }
+}
+
+@media (max-width: 414px) {
+  .list-container {
+    padding: 0.75rem;
+  }
+
+  .filter-card {
+    padding: 0.75rem;
+  }
+
+  .list-header h2 {
+    font-size: 1.2rem;
+  }
+}
 </style>

@@ -565,3 +565,50 @@ textarea:focus {
   outline: none;
   box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
 }
+
+/* ============================================
+   移动端响应式 - 6.59 英寸 / 2412*1080 等手机
+   仅在小屏生效，不影响桌面端
+   ============================================ */
+
+/* 移动端容器内边距（仅小屏） */
+@media (max-width: 480px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (max-width: 414px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+/* 移动端触摸目标最小高度 44px（仅小屏） */
+@media (max-width: 768px) {
+  .btn,
+  .el-button,
+  button.nav-link,
+  button.icon-btn,
+  button.nav-btn,
+  button.user-btn {
+    min-height: 44px;
+  }
+}
+
+/* 移动端全局对话框宽度（避免小屏溢出） */
+@media (max-width: 480px) {
+  .el-dialog {
+    width: 92% !important;
+    max-width: 92%;
+    margin: 5vh auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 1rem;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}

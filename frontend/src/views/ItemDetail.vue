@@ -2113,6 +2113,66 @@ const goToItem = (itemId) => {
   }
 }
 
+/* 移动端适配（约 6.59 英寸 / 2412*1080） */
+@media (max-width: 480px) {
+  .item-detail-container {
+    margin: 1rem auto;
+    padding: 0 1rem;
+  }
+
+  .back-button {
+    margin-bottom: 1rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .detail-card {
+    padding: 1rem;
+  }
+
+  .title-section h2 {
+    font-size: 1.4rem;
+  }
+
+  .tags {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .action-section {
+    gap: 0.75rem;
+  }
+
+  .action-section .el-button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .thumbnail-item {
+    width: 60px;
+    height: 60px;
+  }
+
+  .claim-actions {
+    flex-wrap: wrap;
+  }
+
+  .claim-actions .el-button {
+    flex: 1;
+    min-width: 80px;
+  }
+}
+
+@media (max-width: 414px) {
+  .item-detail-container {
+    padding: 0 0.75rem;
+  }
+
+  .title-section h2 {
+    font-size: 1.25rem;
+  }
+}
+
 /* 对话框中的输入框样式 */
 .item-detail-container :deep(.el-dialog) {
   background: var(--color-card);
@@ -2137,6 +2197,19 @@ const goToItem = (itemId) => {
 .item-detail-container :deep(.el-dialog .el-button:hover) {
   transform: translateY(-2px) translateX(-2px);
   box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+/* 移动端对话框全宽 */
+@media (max-width: 480px) {
+  .item-detail-container :deep(.el-dialog) {
+    width: 95% !important;
+    max-width: 95%;
+    margin: 0 auto;
+  }
+
+  .item-detail-container :deep(.el-dialog__body) {
+    padding: 1rem;
+  }
 }
 
 /* 匹配推荐卡片 */

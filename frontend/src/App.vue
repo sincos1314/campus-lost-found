@@ -12,7 +12,12 @@
             <span class="app-title">UniFind校园寻宝</span>
           </div>
 
-          <!-- 导航菜单 -->
+          <!-- 移动端汉堡菜单按钮（仅小屏显示） -->
+          <button type="button" class="mobile-menu-btn" aria-label="打开菜单" @click="drawerVisible = true">
+            <el-icon :size="24"><Grid /></el-icon>
+          </button>
+
+          <!-- 导航菜单（桌面端显示，小屏隐藏由抽屉替代） -->
           <div class="nav-menu">
             <button 
               class="nav-link"
@@ -148,6 +153,55 @@
       <el-main class="app-main gradient-bg">
         <router-view />
       </el-main>
+
+      <!-- 移动端导航抽屉（仅小屏使用） -->
+      <el-drawer
+        v-model="drawerVisible"
+        title="菜单"
+        direction="ltr"
+        size="280px"
+        class="mobile-drawer"
+        :with-header="true"
+      >
+        <div class="drawer-nav">
+          <button class="drawer-link" :class="{ active: isActiveRoute('/list/lost') }" @click="navAndClose(goToLostSquare)">
+            <el-icon><Search /></el-icon>
+            <span>失物广场</span>
+          </button>
+          <button class="drawer-link" :class="{ active: isActiveRoute('/list/found') }" @click="navAndClose(goToFoundSquare)">
+            <el-icon><Present /></el-icon>
+            <span>拾物广场</span>
+          </button>
+          <button class="drawer-link" :class="{ active: isActiveRoute('/post') }" @click="navAndClose(goToPost)">
+            <el-icon><Plus /></el-icon>
+            <span>发布信息</span>
+          </button>
+          <button v-if="isLoggedInComputed" class="drawer-link" :class="{ active: isActiveRoute('/my-items') }" @click="navAndClose(goToMyItems)">
+            <el-icon><FolderOpened /></el-icon>
+            <span>我的发布</span>
+          </button>
+          <button v-if="isLoggedInComputed" class="drawer-link" :class="{ active: isActiveRoute('/my-favorites') }" @click="navAndClose(goToMyFavorites)">
+            <el-icon><Star /></el-icon>
+            <span>我的收藏</span>
+          </button>
+          <button v-if="isLoggedInComputed" class="drawer-link" :class="{ active: isActiveRoute('/my-reports') }" @click="navAndClose(goToMyReports)">
+            <el-icon><Warning /></el-icon>
+            <span>我的举报</span>
+          </button>
+          <button v-if="isLoggedInComputed" class="drawer-link" :class="{ active: isActiveRoute('/my-claims') }" @click="navAndClose(goToMyClaims)">
+            <el-icon><Trophy /></el-icon>
+            <span>我的认领</span>
+          </button>
+          <button v-if="isLoggedInComputed" class="drawer-link" :class="{ active: isActiveRoute('/claim-management') }" @click="navAndClose(goToClaimManagement)">
+            <el-icon><DocumentChecked /></el-icon>
+            <span>认领管理</span>
+          </button>
+          <button v-if="isLoggedInComputed && user?.role === 'admin'" class="drawer-link" :class="{ active: isActiveRoute('/admin') }" @click="navAndClose(goToDashboard)">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>数据看板</span>
+          </button>
+        </div>
+      </el-drawer>
     </el-container>
   </div>
 </template>
@@ -156,7 +210,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { isLoggedIn, getUser, removeToken } from './utils/auth'
-import { Compass, User, Bell, ArrowDown, ChatDotRound, Search, Moon, Sunny, Plus, DataAnalysis, Present, FolderOpened, Warning, Star, Trophy, DocumentChecked } from '@element-plus/icons-vue'
+import { Compass, User, Bell, ArrowDown, ChatDotRound, Search, Moon, Sunny, Plus, DataAnalysis, Present, FolderOpened, Warning, Star, Trophy, DocumentChecked, Grid } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from './utils/request'
 
@@ -167,6 +221,13 @@ const user = ref(null)
 const unreadCount = ref(0)
 const unreadMessageCount = ref(0) // 新增：未读私信数
 const darkMode = ref(false)
+const drawerVisible = ref(false) // 移动端导航抽屉
+
+// 导航并关闭抽屉（移动端）
+const navAndClose = (fn) => {
+  if (typeof fn === 'function') fn()
+  drawerVisible.value = false
+}
 
 // 活动菜单项
 const activeMenu = computed(() => {
@@ -357,7 +418,9 @@ onMounted(() => {
   background: var(--color-card);
   border-bottom: var(--border-width) solid var(--border-color);
   padding: 0;
+  padding-top: env(safe-area-inset-top, 0);
   height: 80px;
+  min-height: calc(80px + env(safe-area-inset-top, 0));
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -374,6 +437,28 @@ onMounted(() => {
   height: 100%;
   gap: 1rem;
   overflow: hidden;
+}
+
+/* 移动端汉堡按钮：默认隐藏，仅小屏显示 */
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-size: 1.25rem;
+}
+
+.mobile-menu-btn:hover {
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
 }
 
 /* Logo 区域 */
@@ -586,39 +671,121 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .app-header {
-    height: 70px;
+    height: 64px;
+    min-height: calc(64px + env(safe-area-inset-top, 0));
   }
   
   .header-content {
-    padding: 0 0.5rem;
+    padding: 0 calc(0.5rem + env(safe-area-inset-right, 0)) 0 calc(0.5rem + env(safe-area-inset-left, 0));
     gap: 0.5rem;
+  }
+  
+  /* 小屏：显示汉堡、隐藏顶部横向导航 */
+  .mobile-menu-btn {
+    display: flex;
+    flex-shrink: 0;
+  }
+  
+  .nav-menu {
+    display: none !important;
   }
   
   .app-title {
     font-size: 1rem;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
   .logo-icon {
-    width: 32px;
-    height: 32px;
-  }
-  
-  .nav-link {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-  }
-  
-  .nav-link .el-icon {
-    display: none;
+    width: 36px;
+    height: 36px;
   }
   
   .user-btn span {
     display: none;
   }
   
-  .icon-btn {
-    width: 32px;
-    height: 32px;
+  .user-btn {
+    padding: 0.5rem 0.75rem;
+    min-width: 44px;
   }
+  
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .nav-btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+  
+  .app-main {
+    min-height: calc(100vh - 64px - env(safe-area-inset-top, 0));
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* 移动端导航抽屉样式 */
+.mobile-drawer :deep(.el-drawer__header) {
+  margin-bottom: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: var(--border-width) solid var(--border-color);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.mobile-drawer :deep(.el-drawer__body) {
+  padding: 0.75rem;
+  background: var(--color-primary);
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--color-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-family: inherit;
+  text-align: left;
+  min-height: 48px;
+}
+
+.drawer-link:hover {
+  background: var(--color-primary);
+  transform: translateY(-2px) translateX(-2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--shadow-color);
+}
+
+.drawer-link.active {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+}
+
+.drawer-link .el-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
 }
 </style>

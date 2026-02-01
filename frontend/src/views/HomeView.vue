@@ -472,6 +472,14 @@ body:not(.dark) .holographic-text {
 }
 
 @media (max-width: 480px) {
+  .home-container {
+    padding: 1rem;
+  }
+
+  .hero-section {
+    padding: 1rem;
+  }
+
   .hero-title {
     font-size: 2.5rem;
   }
@@ -479,6 +487,48 @@ body:not(.dark) .holographic-text {
   .hero-badge {
     font-size: 0.8rem;
     padding: 0.4rem 1rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+  }
+
+  .action-btn {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 414px) {
+  .home-container {
+    padding: 0.75rem;
+  }
+
+  .hero-title {
+    font-size: 2.1rem;
+  }
+
+  .hero-badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.85rem;
+  }
+
+  .stats-section {
+    padding: 0 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.75rem;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
   }
 }
 
@@ -683,6 +733,7 @@ body:not(.dark) .holographic-text {
 @media (max-width: 480px) {
   .stats-section {
     margin-top: 2rem;
+    padding: 0 1rem;
   }
 
   .stat-card {
