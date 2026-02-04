@@ -431,47 +431,48 @@ onMounted(() => {
 /* ========== 移动端个人中心排版 ========== */
 @media (max-width: 768px) {
   .profile-container {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 
   .user-card,
   .profile-card {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
   }
 
   .profile-card :deep(.el-card__header) {
-    padding: 0 0 0.75rem 0;
+    padding: 0 0 0.5rem 0;
   }
 
-  /* 整体左对齐：缩小 label 宽度，表单项紧凑 */
+  /* 整体左对齐：标签更窄，标签与输入框距离收紧，表单项间距缩小 */
   .profile-card :deep(.el-form-item) {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
   }
 
   .profile-card :deep(.el-form-item__label) {
-    width: 72px !important;
-    min-width: 72px !important;
+    width: 56px !important;
+    min-width: 56px !important;
     text-align: left;
-    padding-right: 12px;
+    padding-right: 6px;
   }
 
   .profile-card :deep(.el-form-item__content) {
-    margin-left: 72px !important;
-    max-width: 260px;
+    margin-left: 56px !important;
+    max-width: 180px;
   }
 
-  /* 输入框、下拉框统一宽度，略小且不遮挡内容 */
+  /* 输入框、下拉框统一为紧凑宽度（参照用户名框样式） */
   .profile-card :deep(.el-input),
   .profile-card :deep(.el-select) {
     width: 100%;
-    max-width: 260px;
+    max-width: 180px;
   }
 
   .profile-card :deep(.el-input__wrapper),
   .profile-card :deep(.el-select__wrapper) {
     min-width: 0;
     width: 100%;
-    max-width: 260px;
+    max-width: 180px;
+    padding: 0.5rem 0.75rem !important;
   }
 
   .profile-card :deep(.el-input__inner) {
@@ -480,7 +481,7 @@ onMounted(() => {
 
   /* 分割线 */
   .profile-card :deep(.el-divider) {
-    margin: 1rem 0 0.75rem 0;
+    margin: 0.75rem 0 0.5rem 0;
   }
 
   .profile-card :deep(.el-divider__text) {
@@ -500,7 +501,7 @@ onMounted(() => {
     text-align: center;
     height: auto;
     line-height: 1.5;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
   }
 
   .profile-card :deep(.privacy-visibility-item .el-form-item__content) {
@@ -524,17 +525,18 @@ onMounted(() => {
 
   /* “其他人默认”等后续表单项恢复左对齐 */
   .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__label) {
-    width: 72px !important;
+    width: 56px !important;
     text-align: left;
   }
 
   .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__content) {
-    margin-left: 72px !important;
+    margin-left: 56px !important;
+    max-width: 180px;
   }
 
   /* 修改密码区域：同样左对齐、小方框、缩小间距 */
   .profile-card :deep(.el-divider + .el-form-item) {
-    margin-top: 0.5rem;
+    margin-top: 0.35rem;
   }
 
   /* 保存按钮同一行、有间距 */
