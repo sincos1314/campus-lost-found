@@ -443,10 +443,7 @@ onMounted(() => {
     padding: 0 0 0.5rem 0;
   }
 
-  /* 整体左对齐：标签更窄，标签与输入框距离收紧，表单项间距缩小 */
-  .profile-card :deep(.el-form-item) {
-    margin-bottom: 0.5rem;
-  }
+  /* 整体左对齐：标签更窄，标签与输入框距离收紧 */
 
   .profile-card :deep(.el-form-item__label) {
     width: 56px !important;
@@ -477,11 +474,24 @@ onMounted(() => {
 
   .profile-card :deep(.el-input__inner) {
     min-width: 0;
+    text-align: center;
+  }
+
+  /* 黑色方框内内容居中（与图三一致），年级/性别下拉框内也居中 */
+  .profile-card :deep(.el-input .el-input__inner),
+  .profile-card :deep(.el-select .el-select__placeholder),
+  .profile-card :deep(.el-select .el-select__selected-item) {
+    text-align: center !important;
+  }
+
+  /* 字段间距统一 */
+  .profile-card :deep(.el-form-item) {
+    margin-bottom: 0.6rem;
   }
 
   /* 分割线 */
   .profile-card :deep(.el-divider) {
-    margin: 0.75rem 0 0.5rem 0;
+    margin: 0.7rem 0 0.6rem 0;
   }
 
   .profile-card :deep(.el-divider__text) {
@@ -489,7 +499,7 @@ onMounted(() => {
     font-weight: 700;
   }
 
-  /* 隐私设置：标题居中，三个选项同一行在下方 */
+  /* 隐私设置：发布历史可见性居中（与图四一致），三个选项同一行在下方 */
   .profile-card :deep(.privacy-visibility-item.el-form-item) {
     display: block;
   }
@@ -498,10 +508,11 @@ onMounted(() => {
     width: 100% !important;
     max-width: 100% !important;
     margin-left: 0 !important;
-    text-align: center;
+    text-align: center !important;
     height: auto;
     line-height: 1.5;
-    padding-bottom: 0.35rem;
+    padding-bottom: 0.4rem;
+    display: block;
   }
 
   .profile-card :deep(.privacy-visibility-item .el-form-item__content) {
