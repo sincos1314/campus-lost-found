@@ -116,7 +116,7 @@
                 </button>
               </el-badge>
 
-              <button class="icon-btn" @click="toggleDarkMode">
+              <button class="icon-btn dark-mode-btn" @click="toggleDarkMode" aria-label="夜间模式">
                 <el-icon v-if="!darkMode"><Moon /></el-icon>
                 <el-icon v-else><Sunny /></el-icon>
               </button>
@@ -138,7 +138,7 @@
             </template>
 
             <template v-else>
-              <button class="icon-btn" @click="toggleDarkMode">
+              <button class="icon-btn dark-mode-btn" @click="toggleDarkMode" aria-label="夜间模式">
                 <el-icon v-if="!darkMode"><Moon /></el-icon>
                 <el-icon v-else><Sunny /></el-icon>
               </button>
@@ -201,6 +201,14 @@
             <span>数据看板</span>
           </button>
         </div>
+        <!-- 移动端：夜间模式放入抽屉，避免顶栏图标过多溢出 -->
+        <div class="drawer-footer">
+          <button type="button" class="drawer-link drawer-link-theme" @click="toggleDarkModeThenClose">
+            <el-icon v-if="!darkMode"><Moon /></el-icon>
+            <el-icon v-else><Sunny /></el-icon>
+            <span>{{ darkMode ? '日间模式' : '夜间模式' }}</span>
+          </button>
+        </div>
       </el-drawer>
     </el-container>
   </div>
@@ -226,6 +234,12 @@ const drawerVisible = ref(false) // 移动端导航抽屉
 // 导航并关闭抽屉（移动端）
 const navAndClose = (fn) => {
   if (typeof fn === 'function') fn()
+  drawerVisible.value = false
+}
+
+// 切换夜间模式并关闭抽屉（移动端抽屉内使用）
+const toggleDarkModeThenClose = () => {
+  toggleDarkMode()
   drawerVisible.value = false
 }
 
@@ -437,6 +451,7 @@ onMounted(() => {
   height: 100%;
   gap: 1rem;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* 移动端汉堡按钮：默认隐藏，仅小屏显示 */
@@ -469,6 +484,7 @@ onMounted(() => {
   cursor: pointer;
   transition: transform 0.2s ease;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .logo-section:hover {
@@ -494,6 +510,9 @@ onMounted(() => {
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 导航菜单 */
@@ -676,31 +695,53 @@ onMounted(() => {
   }
   
   .header-content {
-    padding: 0 calc(0.5rem + env(safe-area-inset-right, 0)) 0 calc(0.5rem + env(safe-area-inset-left, 0));
-    gap: 0.5rem;
+    padding: 0 calc(0.35rem + env(safe-area-inset-right, 0)) 0 calc(0.35rem + env(safe-area-inset-left, 0));
+    gap: 0.25rem;
+  }
+  
+  /* 左侧：Logo 可收缩，标题过长时省略 */
+  .logo-section {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .app-title {
+    font-size: 0.95rem;
+    max-width: 110px;
+  }
+  
+  .logo-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+  
+  .logo-icon .el-icon {
+    font-size: 20px;
   }
   
   /* 小屏：显示汉堡、隐藏顶部横向导航 */
   .mobile-menu-btn {
     display: flex;
     flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
   }
   
   .nav-menu {
     display: none !important;
   }
   
-  .app-title {
-    font-size: 1rem;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* 移动端顶栏隐藏夜间模式按钮，改在抽屉内操作，避免右侧溢出 */
+  .dark-mode-btn {
+    display: none !important;
   }
   
-  .logo-icon {
-    width: 36px;
-    height: 36px;
+  .user-section {
+    gap: 0.2rem;
+    flex-shrink: 0;
+    min-width: 0;
   }
   
   .user-btn span {
@@ -708,21 +749,31 @@ onMounted(() => {
   }
   
   .user-btn {
-    padding: 0.5rem 0.75rem;
-    min-width: 44px;
+    padding: 0.4rem 0.5rem;
+    min-width: 40px;
+    font-size: 0.85rem;
   }
   
   .icon-btn {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 1.1rem;
   }
   
   .nav-btn {
-    padding: 0.5rem 0.9rem;
-    font-size: 0.9rem;
-    min-height: 44px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  
+  .message-badge :deep(.el-badge__content),
+  .notification-badge :deep(.el-badge__content) {
+    font-size: 10px;
+    padding: 0 4px;
+    height: 16px;
+    line-height: 16px;
   }
   
   .app-main {
@@ -743,12 +794,17 @@ onMounted(() => {
 .mobile-drawer :deep(.el-drawer__body) {
   padding: 0.75rem;
   background: var(--color-primary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .drawer-nav {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .drawer-link {
@@ -787,5 +843,15 @@ onMounted(() => {
 .drawer-link .el-icon {
   font-size: 1.25rem;
   flex-shrink: 0;
+}
+
+.drawer-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: var(--border-width) solid var(--border-color);
+}
+
+.drawer-link-theme {
+  background: var(--color-primary);
 }
 </style>

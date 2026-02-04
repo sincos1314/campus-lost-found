@@ -354,6 +354,8 @@ const onDateChange = () => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .filter-card {
@@ -363,6 +365,8 @@ const onDateChange = () => {
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
   padding: 1.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 移除 Element Plus 默认的输入框包装器样式 */
@@ -645,6 +649,15 @@ const onDateChange = () => {
   font-weight: 600;
 }
 
+/* 小屏下日期范围选择器不溢出 */
+@media (max-width: 768px) {
+  .filter-card :deep(.el-date-editor.el-range-editor) {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+}
+
 /* 移动端适配（约 6.59 英寸 / 2412*1080 逻辑宽约 393px） */
 @media (max-width: 480px) {
   .list-container {
@@ -654,6 +667,7 @@ const onDateChange = () => {
   .filter-card {
     padding: 1rem;
     margin-bottom: 1.5rem;
+    overflow: hidden;
   }
 
   .filter-card :deep(.el-row) {
@@ -664,6 +678,27 @@ const onDateChange = () => {
   .filter-card :deep(.el-col) {
     padding-left: 8px;
     padding-right: 8px;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* 日期范围选择器占满宽度，防止右侧被裁切 */
+  .filter-card :deep(.el-date-editor.el-range-editor) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .filter-card :deep(.el-date-editor .el-range-separator) {
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+
+  .filter-card :deep(.el-date-editor .el-range-input) {
+    min-width: 0;
+    flex: 1;
+    max-width: 45%;
   }
 
   .action-buttons {

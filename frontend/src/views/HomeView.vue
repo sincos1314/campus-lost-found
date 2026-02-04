@@ -201,6 +201,8 @@ onMounted(() => {
   justify-content: center;
   padding: 2rem;
   overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* 装饰性 Blob 元素 */
@@ -540,6 +542,7 @@ body:not(.dark) .holographic-text {
   max-width: 1200px;
   margin: 4rem auto 2rem;
   padding: 0 2rem;
+  box-sizing: border-box;
 }
 
 .stats-container {
@@ -547,6 +550,7 @@ body:not(.dark) .holographic-text {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   animation: fadeInUp 0.6s ease-out;
+  min-width: 0;
 }
 
 /* 统计卡片 */
@@ -561,6 +565,8 @@ body:not(.dark) .holographic-text {
   overflow: hidden;
   animation: slideInUp 0.6s ease-out both;
   cursor: default;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .stat-card:hover {
@@ -607,6 +613,10 @@ body:not(.dark) .holographic-text {
   margin-bottom: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .stat-value {
@@ -616,6 +626,8 @@ body:not(.dark) .holographic-text {
   line-height: 1;
   font-family: 'Arial Black', sans-serif;
   position: relative;
+  overflow: hidden;
+  word-break: break-all;
 }
 
 .stat-value::after {
@@ -734,10 +746,18 @@ body:not(.dark) .holographic-text {
   .stats-section {
     margin-top: 2rem;
     padding: 0 1rem;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .stats-container {
+    min-width: 0;
+    width: 100%;
   }
 
   .stat-card {
     padding: 1.2rem;
+    min-width: 0;
   }
 
   .stat-value {
