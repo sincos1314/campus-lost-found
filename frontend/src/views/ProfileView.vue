@@ -443,32 +443,32 @@ onMounted(() => {
     padding: 0 0 0.5rem 0;
   }
 
-  /* 整体左对齐：标签更窄，标签与输入框距离收紧 */
-
+  /* 整体左对齐：标签与黑色方框距离再收紧，方框往左移；标签不换行（确认密码一行显示） */
   .profile-card :deep(.el-form-item__label) {
-    width: 56px !important;
-    min-width: 56px !important;
+    width: 54px !important;
+    min-width: 54px !important;
     text-align: left;
-    padding-right: 6px;
+    padding-right: 4px;
+    white-space: nowrap;
   }
 
   .profile-card :deep(.el-form-item__content) {
-    margin-left: 56px !important;
-    max-width: 180px;
+    margin-left: 54px !important;
+    max-width: 240px;
   }
 
-  /* 输入框、下拉框统一为紧凑宽度（参照用户名框样式） */
+  /* 输入框、下拉框拉长以便邮箱等完整显示，宽度统一 */
   .profile-card :deep(.el-input),
   .profile-card :deep(.el-select) {
     width: 100%;
-    max-width: 180px;
+    max-width: 240px;
   }
 
   .profile-card :deep(.el-input__wrapper),
   .profile-card :deep(.el-select__wrapper) {
     min-width: 0;
     width: 100%;
-    max-width: 180px;
+    max-width: 240px;
     padding: 0.5rem 0.75rem !important;
   }
 
@@ -536,13 +536,14 @@ onMounted(() => {
 
   /* “其他人默认”等后续表单项恢复左对齐 */
   .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__label) {
-    width: 56px !important;
+    width: 54px !important;
     text-align: left;
+    white-space: nowrap;
   }
 
   .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__content) {
-    margin-left: 56px !important;
-    max-width: 180px;
+    margin-left: 54px !important;
+    max-width: 240px;
   }
 
   /* 修改密码区域：同样左对齐、小方框、缩小间距 */
