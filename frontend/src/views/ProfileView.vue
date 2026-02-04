@@ -80,8 +80,8 @@
             </el-form-item>
 
             <el-divider content-position="left">隐私设置</el-divider>
-            <el-form-item label="发布历史可见性">
-              <el-radio-group v-model="privacy.visibility_setting">
+            <el-form-item label="发布历史可见性" class="privacy-visibility-item">
+              <el-radio-group v-model="privacy.visibility_setting" class="privacy-radio-group">
                 <el-radio label="hidden">隐藏</el-radio>
                 <el-radio label="partial">部分隐藏</el-radio>
                 <el-radio label="public">不隐藏</el-radio>
@@ -115,7 +115,7 @@
               />
             </el-form-item>
 
-            <el-form-item>
+            <el-form-item class="profile-actions-item">
               <el-button type="primary" @click="handleUpdate" :loading="loading">
                 保存修改
               </el-button>
@@ -426,5 +426,129 @@ onMounted(() => {
 
 .avatar-uploader {
   margin-top: 1rem;
+}
+
+/* ========== 移动端个人中心排版 ========== */
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 1rem;
+  }
+
+  .user-card,
+  .profile-card {
+    padding: 1rem;
+  }
+
+  .profile-card :deep(.el-card__header) {
+    padding: 0 0 0.75rem 0;
+  }
+
+  /* 整体左对齐：缩小 label 宽度，表单项紧凑 */
+  .profile-card :deep(.el-form-item) {
+    margin-bottom: 0.75rem;
+  }
+
+  .profile-card :deep(.el-form-item__label) {
+    width: 72px !important;
+    min-width: 72px !important;
+    text-align: left;
+    padding-right: 12px;
+  }
+
+  .profile-card :deep(.el-form-item__content) {
+    margin-left: 72px !important;
+    max-width: 260px;
+  }
+
+  /* 输入框、下拉框统一宽度，略小且不遮挡内容 */
+  .profile-card :deep(.el-input),
+  .profile-card :deep(.el-select) {
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .profile-card :deep(.el-input__wrapper),
+  .profile-card :deep(.el-select__wrapper) {
+    min-width: 0;
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .profile-card :deep(.el-input__inner) {
+    min-width: 0;
+  }
+
+  /* 分割线 */
+  .profile-card :deep(.el-divider) {
+    margin: 1rem 0 0.75rem 0;
+  }
+
+  .profile-card :deep(.el-divider__text) {
+    padding: 0 0.5rem;
+    font-weight: 700;
+  }
+
+  /* 隐私设置：标题居中，三个选项同一行在下方 */
+  .profile-card :deep(.privacy-visibility-item.el-form-item) {
+    display: block;
+  }
+
+  .profile-card :deep(.privacy-visibility-item .el-form-item__label) {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    text-align: center;
+    height: auto;
+    line-height: 1.5;
+    padding-bottom: 0.5rem;
+  }
+
+  .profile-card :deep(.privacy-visibility-item .el-form-item__content) {
+    margin-left: 0 !important;
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .profile-card :deep(.privacy-radio-group) {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  .profile-card :deep(.privacy-radio-group .el-radio) {
+    margin-right: 0;
+    white-space: nowrap;
+  }
+
+  /* “其他人默认”等后续表单项恢复左对齐 */
+  .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__label) {
+    width: 72px !important;
+    text-align: left;
+  }
+
+  .profile-card :deep(.privacy-visibility-item + .el-form-item .el-form-item__content) {
+    margin-left: 72px !important;
+  }
+
+  /* 修改密码区域：同样左对齐、小方框、缩小间距 */
+  .profile-card :deep(.el-divider + .el-form-item) {
+    margin-top: 0.5rem;
+  }
+
+  /* 保存按钮同一行、有间距 */
+  .profile-card :deep(.profile-actions-item .el-form-item__content) {
+    margin-left: 0 !important;
+    max-width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .profile-card :deep(.profile-actions-item .el-button) {
+    margin: 0;
+  }
 }
 </style>
