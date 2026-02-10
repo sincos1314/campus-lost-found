@@ -71,6 +71,12 @@
   - 标记已解决
   - 删除发布
 
+#### 收藏与认领
+- ✅ 收藏物品（我的收藏）
+- ✅ 对拾物发起认领申请
+- ✅ 我的认领记录（待处理/已批准/已拒绝）
+- ✅ 认领管理（发布者处理他人认领申请）
+
 #### 私信功能
 - ✅ 实时私信沟通（基于 WebSocket）
 - ✅ 文本消息发送
@@ -79,10 +85,9 @@
 - ✅ 正在输入提示
 - ✅ 消息撤回功能
 
-#### 隐私设置
-- ✅ 发布历史可见性设置（隐藏/部分隐藏/不隐藏）
-- ✅ 自定义可见名单管理
-- ✅ 查看其他用户发布历史（遵循隐私规则）
+#### 通知与隐私
+- ✅ 消息与认领等通知提醒
+- ✅ 隐私设置：发布历史可见性（隐藏/部分隐藏/不隐藏）、可见名单、查看他人发布历史（遵循隐私规则）
 
 #### 举报功能
 - ✅ 物品举报（支持匿名举报）
@@ -145,6 +150,7 @@
 | Flask-SocketIO | 5.3.5 | WebSocket 支持 |
 | Flask-CORS | 4.0.0 | 跨域资源共享 |
 | Pillow | 10.1.0 | 图像处理库 |
+| openpyxl | 3.1.2 | Excel 导出 |
 | SQLite | - | 轻量级数据库 |
 
 ---
@@ -333,7 +339,12 @@ npm run dev
 - **拾物广场**：查看所有拾物信息
 - 使用筛选和搜索功能快速找到目标物品
 
-#### 5. 私信沟通
+#### 5. 收藏与认领
+
+- **收藏**：在物品详情页可收藏物品，在「我的收藏」中查看
+- **认领**：对拾物可发起认领申请，在「我的认领记录」查看状态；发布者可在「认领管理」中处理申请
+
+#### 6. 私信沟通
 
 - 在物品详情页点击"联系发布者"
 - 或进入"私信"页面查看所有会话
@@ -344,13 +355,28 @@ npm run dev
 
 #### 设置管理员
 
-首次使用需要手动设置高级管理员，方法如下：
+首次使用需要设置高级管理员，推荐使用项目自带脚本（需先激活后端虚拟环境并进入 `backend` 目录）：
 
-1. 确保后端服务已启动
-2. 使用 Python 连接到数据库：
+**方法一：使用 create_admin.py 脚本（推荐）**
+
+```bash
+cd backend
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+# 创建新的高级管理员账户
+python create_admin.py --username admin --email admin@example.com --password your_password
+
+# 或将已有用户提升为高级管理员
+python create_admin.py --username 已有用户名 --promote
+
+# 查看所有管理员
+python create_admin.py --list
+```
+
+**方法二：Python 交互**
 
 ```python
-# 方法一：使用 Python 脚本
+# 确保后端依赖已安装，在 backend 目录下
 python
 >>> from app import app, db, User
 >>> with app.app_context():
@@ -361,19 +387,12 @@ python
 ...     print('设置成功！')
 ```
 
-或者使用 SQLite 命令行工具：
+**方法三：SQLite 命令行**
 
 ```bash
-# 进入后端目录
 cd backend
-
-# 打开数据库（需要先安装 sqlite3）
 sqlite3 lost_found.db
-
-# 执行 SQL 命令
 UPDATE user SET role='admin', admin_level='high' WHERE username='你的用户名';
-
-# 退出
 .quit
 ```
 
@@ -391,13 +410,15 @@ UPDATE user SET role='admin', admin_level='high' WHERE username='你的用户名
 ## 📁 项目结构
 
 ```
-lost-found-system/
+campus-lost-found/
 │
-├── backend/                 # 后端代码目录
-│   ├── app.py              # Flask 主应用文件
-│   ├── requirements.txt    # Python 依赖列表
-│   ├── lost_found.db       # SQLite 数据库（运行后自动生成）
-│   └── uploads/            # 上传文件存储目录（自动创建）
+├── backend/                    # 后端代码目录
+│   ├── app.py                  # Flask 主应用文件
+│   ├── requirements.txt        # Python 依赖列表
+│   ├── create_admin.py         # 创建/提升高级管理员脚本
+│   ├── create_test_items.py    # 生成测试物品数据脚本
+│   ├── lost_found.db           # SQLite 数据库（运行后自动生成）
+│   └── uploads/                # 上传文件存储目录（自动创建）
 │       ├── avatars/        # 用户头像
 │       ├── items/          # 物品图片
 │       ├── messages/       # 私信图片
@@ -422,26 +443,28 @@ lost-found-system/
 │   │   │   ├── RegisterView.vue   # 注册页
 │   │   │   ├── PostItem.vue       # 发布信息页
 │   │   │   ├── ItemList.vue       # 物品列表页
-│   │   │   ├── ItemDetail.vue    # 物品详情页
-│   │   │   ├── MyItems.vue        # 我的发布页
-│   │   │   ├── ProfileView.vue    # 个人中心页
-│   │   │   ├── MessagesView.vue   # 私信列表页
-│   │   │   ├── ChatView.vue       # 聊天页面
-│   │   │   ├── MyReports.vue      # 我的举报页
-│   │   │   ├── UserItems.vue      # 用户发布历史页
-│   │   │   └── AdminView.vue      # 管理员页面
+│   │   │   ├── ItemDetail.vue       # 物品详情页
+│   │   │   ├── MyItems.vue          # 我的发布页
+│   │   │   ├── MyFavorites.vue      # 我的收藏页
+│   │   │   ├── MyClaims.vue         # 我的认领记录页
+│   │   │   ├── ClaimManagement.vue  # 认领管理页
+│   │   │   ├── ProfileView.vue      # 个人中心页
+│   │   │   ├── NotificationsView.vue # 通知页
+│   │   │   ├── MessagesView.vue     # 私信列表页
+│   │   │   ├── ChatView.vue         # 聊天页面
+│   │   │   ├── MyReports.vue        # 我的举报页
+│   │   │   ├── UserItems.vue        # 用户发布历史页
+│   │   │   └── AdminView.vue        # 管理员页面
 │   │   ├── App.vue         # 根组件
 │   │   └── main.js         # 入口文件
 │   ├── index.html          # HTML 模板
 │   ├── package.json        # 前端依赖配置
-│   └── vite.config.js      # Vite 配置文件
+│   └── vite.config.js          # Vite 配置文件
 │
-├── deploy/                  # 部署相关文件
-│   ├── nginx.conf          # Nginx 配置示例
-│   └── campus-lost-found-backend.service  # 系统服务配置
-│
-└── README.md               # 项目说明文档（本文件）
+└── README.md                   # 项目说明文档（本文件）
 ```
+
+> 部署时 Nginx 与 systemd 配置需在服务器上按「云服务器部署指南」创建，项目内无 `deploy/` 目录。
 
 ---
 
@@ -1251,6 +1274,17 @@ A:
 - **前端热重载**：修改前端代码后，浏览器会自动刷新
 - **后端自动重载**：修改后端代码后，需要手动重启服务
 
+### 后端脚本
+
+- **create_admin.py**：创建或提升高级管理员（见上文「设置管理员」）
+- **create_test_items.py**：生成测试物品数据，例如：
+  ```bash
+  cd backend
+  python create_test_items.py                    # 默认数量
+  python create_test_items.py --lost 20 --found 20  # 指定失物/拾物数量
+  python create_test_items.py --user-id 1        # 指定发布用户 ID
+  ```
+
 ### 生产构建
 
 #### 构建前端
@@ -1276,7 +1310,13 @@ npm run preview
 创建 `.env.development`（开发环境）和 `.env.production`（生产环境）：
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
+# 开发环境通常可不配置，默认使用 http://localhost:5000
+VITE_API_BASE=http://localhost:5000
+VITE_SOCKET_ORIGIN=http://localhost:5000
+
+# 生产环境示例
+# VITE_API_BASE=http://您的服务器IP
+# VITE_SOCKET_ORIGIN=http://您的服务器IP
 ```
 
 #### 后端环境变量
