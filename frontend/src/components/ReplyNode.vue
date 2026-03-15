@@ -10,7 +10,7 @@
       </template>
       <span class="reply-separator">：</span>
       <span class="reply-content">{{ reply.content }}</span>
-      <span class="reply-time">{{ formatTime(reply.created_at) }}</span>
+      <span class="reply-time"> {{ formatTime(reply.created_at) }}</span>
     </div>
     <div class="reply-actions">
       <el-button
@@ -84,3 +84,63 @@ const isLoggedIn = inject('isLoggedIn');
 const editComment = inject('editComment');
 const deleteComment = inject('deleteComment');
 </script>
+
+<style scoped>
+/* 与 ItemDetail 评论区保持一致，确保时间与内容有分隔（scoped 下子组件不会继承父样式） */
+.reply-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.reply-author {
+  font-weight: 600;
+  color: var(--color-text, #333);
+  font-size: 0.95rem;
+}
+
+.reply-to-text {
+  color: var(--text-secondary, #666);
+  font-size: 0.95rem;
+  margin: 0 0.25rem;
+}
+
+.reply-target {
+  color: var(--color-accent, #409eff);
+  font-weight: 600;
+}
+
+.reply-separator {
+  color: var(--color-text, #333);
+  font-size: 0.95rem;
+}
+
+.reply-content {
+  color: var(--color-text, #333);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.reply-time {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  margin-left: 0.5rem;
+}
+
+.reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+.level-2-replies {
+  margin-top: 0.5rem;
+  padding-left: 0.5rem;
+}
+</style>
