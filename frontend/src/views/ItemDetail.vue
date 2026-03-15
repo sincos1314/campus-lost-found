@@ -544,73 +544,13 @@
                   </div>
                 </div>
 
-                <!-- 二级回复列表（不需要折叠） -->
+                <!-- 二级及多层回复列表（递归展示） -->
                 <div v-if="reply.level2_replies && reply.level2_replies.length > 0" class="level-2-replies">
-                  <div
+                  <ReplyNode
                     v-for="level2Reply in reply.level2_replies"
                     :key="level2Reply.id"
-                    class="reply-item level-2"
-                  >
-                    <!-- 二级回复格式：用户A 回复 用户B：回复内容 时间 或 自己的用户名：回复内容 时间 -->
-                    <div class="reply-line">
-                      <span class="reply-author">{{ level2Reply.username }}</span>
-                      <!-- 二级回复：如果有reply_to_username且不是自己回复自己，显示"回复 用户名" -->
-                      <template v-if="level2Reply.reply_to_user_id && level2Reply.reply_to_user_id !== level2Reply.user_id">
-                        <span class="reply-to-text">
-                          回复
-                          <span class="reply-target">{{ level2Reply.reply_to_username || '用户' }}</span>
-                        </span>
-                      </template>
-                      <span class="reply-separator">：</span>
-                      <span class="reply-content">{{ level2Reply.content }}</span>
-                      <span class="reply-time">{{ formatTime(level2Reply.created_at) }}</span>
-                    </div>
-                    
-                    <!-- 操作按钮 -->
-                    <div class="reply-actions">
-                      <el-button
-                        text
-                        size="small"
-                        @click="toggleReplyInput(level2Reply.id, level2Reply.user_id)"
-                        v-if="isLoggedIn()"
-                      >
-                        回复
-                      </el-button>
-                      <el-button
-                        v-if="level2Reply.user_id === getCurrentUserId()"
-                        text
-                        size="small"
-                        @click="editComment(level2Reply)"
-                      >
-                        编辑
-                      </el-button>
-                      <el-button
-                        v-if="level2Reply.user_id === getCurrentUserId()"
-                        text
-                        size="small"
-                        @click="deleteComment(level2Reply.id)"
-                      >
-                        删除
-                      </el-button>
-                    </div>
-
-                    <!-- 回复二级回复的输入框 -->
-                    <div v-if="replyingTo === level2Reply.id && isLoggedIn()" class="reply-input-box">
-                      <el-input
-                        v-model="replyContent"
-                        type="textarea"
-                        :rows="2"
-                        placeholder="添加回复..."
-                        maxlength="500"
-                      />
-                      <div class="reply-input-actions">
-                        <el-button text @click="cancelReply">取消</el-button>
-                        <el-button type="primary" @click="submitReply(level2Reply.id, level2Reply.user_id)" :disabled="!replyContent.trim()">
-                          回复
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
+                    :reply="level2Reply"
+                  />
                 </div>
               </div>
             </div>
@@ -695,7 +635,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from "vue";
+import { ref, onMounted, computed, watch, nextTick, provide } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   ArrowLeft,
@@ -718,6 +658,7 @@ import {
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ReportDialog from "../components/ReportDialog.vue";
+import ReplyNode from "../components/ReplyNode.vue";
 import request from "../utils/request";
 import { isLoggedIn, getUser } from "../utils/auth";
 import { absoluteUrl, previewList, previewListMultiple } from '../utils/request'
@@ -1522,15 +1463,21 @@ const deleteComment = async (commentId) => {
             deleted = true;
             break;
           }
-          // 如果没找到，可能在二级回复中
-          for (const level1Reply of comment.replies) {
-            if (level1Reply.level2_replies && level1Reply.level2_replies.length > 0) {
-              const level2Index = level1Reply.level2_replies.findIndex(r => r.id === commentId);
-              if (level2Index !== -1) {
-                level1Reply.level2_replies.splice(level2Index, 1);
-                deleted = true;
-                break;
+          // 如果没找到，可能在二级及更深层回复中（递归查找并删除）
+          const removeFromReplies = (replies) => {
+            for (let i = 0; i < (replies || []).length; i++) {
+              if (replies[i].id === commentId) {
+                replies.splice(i, 1);
+                return true;
               }
+              if (removeFromReplies(replies[i].level2_replies)) return true;
+            }
+            return false;
+          };
+          for (const level1Reply of comment.replies) {
+            if (removeFromReplies(level1Reply.level2_replies)) {
+              deleted = true;
+              break;
             }
           }
           if (deleted) break;
@@ -1580,6 +1527,18 @@ const deleteComment = async (commentId) => {
     }
   }
 };
+
+// 为递归回复组件 ReplyNode 提供上下文
+provide('replyingTo', replyingTo);
+provide('replyContent', replyContent);
+provide('formatTime', formatTime);
+provide('toggleReplyInput', toggleReplyInput);
+provide('submitReply', submitReply);
+provide('cancelReply', cancelReply);
+provide('getCurrentUserId', getCurrentUserId);
+provide('isLoggedIn', isLoggedIn);
+provide('editComment', editComment);
+provide('deleteComment', deleteComment);
 
 // 打开认领对话框
 const openClaimDialog = () => {

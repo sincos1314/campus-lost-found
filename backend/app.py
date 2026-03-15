@@ -2642,6 +2642,19 @@ def get_comments(item_id):
     except:
         pass
     
+    def build_reply_with_children(reply_obj, max_depth=20):
+        """递归构建回复及其子回复（level2_replies），支持多层嵌套。"""
+        reply_dict = reply_obj.to_dict(current_user_id)
+        if max_depth <= 0:
+            reply_dict['level2_replies'] = []
+            return reply_dict
+        children = Comment.query.filter_by(parent_id=reply_obj.id, is_deleted=False)\
+            .order_by(Comment.created_at.asc()).all()
+        reply_dict['level2_replies'] = [
+            build_reply_with_children(r, max_depth - 1) for r in children
+        ]
+        return reply_dict
+
     # 获取顶级评论（parent_id为None）
     top_level_comments = Comment.query.filter_by(item_id=item_id, parent_id=None, is_deleted=False)\
         .order_by(Comment.created_at.desc()).all()
@@ -2653,15 +2666,8 @@ def get_comments(item_id):
         level1_replies = Comment.query.filter_by(parent_id=comment.id, is_deleted=False)\
             .order_by(Comment.created_at.asc()).all()
         
-        # 获取所有二级回复（parent_id指向一级回复的）
-        all_replies = []
-        for level1_reply in level1_replies:
-            level1_reply_dict = level1_reply.to_dict(current_user_id)
-            # 获取该一级回复的所有二级回复
-            level2_replies = Comment.query.filter_by(parent_id=level1_reply.id, is_deleted=False)\
-                .order_by(Comment.created_at.asc()).all()
-            level1_reply_dict['level2_replies'] = [r.to_dict(current_user_id) for r in level2_replies]
-            all_replies.append(level1_reply_dict)
+        # 一级回复及其递归的 level2_replies（支持多层回复链）
+        all_replies = [build_reply_with_children(level1_reply) for level1_reply in level1_replies]
         
         comment_dict['replies'] = all_replies
         comment_dict['replies_count'] = len(all_replies)
