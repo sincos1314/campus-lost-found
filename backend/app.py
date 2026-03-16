@@ -1723,17 +1723,44 @@ def delete_item(item_id):
     if item.user_id != user_id:
         return jsonify({'message': '无权限操作'}), 403
     
-    # 删除图片文件
-    if item.image_path:
-        try:
-            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item.image_path))
-        except:
-            pass
-    
-    db.session.delete(item)
-    db.session.commit()
-    
-    return jsonify({'message': '删除成功'})
+    try:
+        # 先删除或解除所有关联数据，避免外键约束导致删除失败
+        comment_ids = [c.id for c in Comment.query.filter_by(item_id=item_id).all()]
+        if comment_ids:
+            CommentLike.query.filter(CommentLike.comment_id.in_(comment_ids)).delete(synchronize_session=False)
+        Comment.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Favorite.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Claim.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Report.query.filter_by(item_id=item_id).update({'item_id': None}, synchronize_session=False)
+        Notification.query.filter_by(related_item_id=item_id).update({'related_item_id': None}, synchronize_session=False)
+        
+        # 删除图片文件（主图 + 多图）
+        if item.image_path:
+            try:
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item.image_path))
+            except Exception:
+                pass
+        if item.images_path:
+            try:
+                image_paths = json.loads(item.images_path)
+                if isinstance(image_paths, list):
+                    for path in image_paths:
+                        if path:
+                            try:
+                                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], path))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+        
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': '删除成功'})
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': f'服务器错误: {str(e)}'}), 500
 
 
 @app.route('/api/image/<path:filename>')
@@ -2471,21 +2498,48 @@ def admin_delete_item(item_id):
     if not admin_required() or not can_mark_item_status(current_admin):
         return jsonify({'message': 'forbidden'}), 403
     item = Item.query.get_or_404(item_id)
-    if item.image_path:
-        try:
-            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item.image_path))
-        except:
-            pass
     owner = User.query.get(item.user_id)
     title = item.title
     category_text = '失物' if item.category == 'lost' else '拾物'
-    db.session.delete(item)
-    db.session.commit()
     try:
-        create_notification(owner.id, '发布删除', f'你的{category_text}信息《{title}》已被管理员删除。', 'warning')
-    except:
-        pass
-    return jsonify({'message': 'deleted'})
+        # 先删除或解除所有关联数据
+        comment_ids = [c.id for c in Comment.query.filter_by(item_id=item_id).all()]
+        if comment_ids:
+            CommentLike.query.filter(CommentLike.comment_id.in_(comment_ids)).delete(synchronize_session=False)
+        Comment.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Favorite.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Claim.query.filter_by(item_id=item_id).delete(synchronize_session=False)
+        Report.query.filter_by(item_id=item_id).update({'item_id': None}, synchronize_session=False)
+        Notification.query.filter_by(related_item_id=item_id).update({'related_item_id': None}, synchronize_session=False)
+        if item.image_path:
+            try:
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item.image_path))
+            except Exception:
+                pass
+        if item.images_path:
+            try:
+                image_paths = json.loads(item.images_path)
+                if isinstance(image_paths, list):
+                    for path in image_paths:
+                        if path:
+                            try:
+                                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], path))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+        db.session.delete(item)
+        db.session.commit()
+        try:
+            create_notification(owner.id, '发布删除', f'你的{category_text}信息《{title}》已被管理员删除。', 'warning')
+        except Exception:
+            pass
+        return jsonify({'message': 'deleted'})
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': f'服务器错误: {str(e)}'}), 500
 
 @app.route('/api/admin/appoint', methods=['POST'])
 @jwt_required()
