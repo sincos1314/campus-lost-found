@@ -16,6 +16,18 @@
       <el-button
         text
         size="small"
+        @click="toggleLike(reply)"
+        :class="{ 'is-liked': reply.is_liked }"
+        class="like-btn"
+      >
+        <svg class="like-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M2 20h2V8H2v12zm20-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1.49 1.49 0 0 0-.44-1.06L13.17 0 6.59 6.59A1.98 1.98 0 0 0 6 8v10a2 2 0 0 0 2 2h9a2 2 0 0 0 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73V9z"/>
+        </svg>
+        <span v-if="reply.like_count > 0" class="like-count">{{ reply.like_count }}</span>
+      </el-button>
+      <el-button
+        text
+        size="small"
         @click="toggleReplyInput(reply.id, reply.user_id)"
         v-if="isLoggedIn()"
       >
@@ -83,6 +95,7 @@ const getCurrentUserId = inject('getCurrentUserId');
 const isLoggedIn = inject('isLoggedIn');
 const editComment = inject('editComment');
 const deleteComment = inject('deleteComment');
+const toggleLike = inject('toggleLike');
 </script>
 
 <style scoped>
@@ -137,6 +150,31 @@ const deleteComment = inject('deleteComment');
   gap: 0.5rem;
   margin-top: 0.25rem;
   margin-left: 0.5rem;
+}
+
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-secondary, #909399);
+  transition: color 0.2s;
+}
+
+.like-btn:hover {
+  color: var(--color-accent, #409eff) !important;
+}
+
+.like-btn.is-liked {
+  color: var(--color-accent, #409eff) !important;
+}
+
+.like-icon {
+  vertical-align: middle;
+}
+
+.like-count {
+  font-size: 0.85rem;
+  margin-left: 0.1rem;
 }
 
 .level-2-replies {

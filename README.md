@@ -6,8 +6,6 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0.0-000000?logo=flask)
 ![Element Plus](https://img.shields.io/badge/Element%20Plus-2.11.7-409EFF?logo=element)
 
----
-
 ## 📋 目录
 
 - [项目简介](#项目简介)

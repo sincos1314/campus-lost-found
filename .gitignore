@@ -24,5 +24,6 @@ pnpm-debug.log*
 Thumbs.db
 
 .vscode/
+.claude/
 .idea/
 *.local

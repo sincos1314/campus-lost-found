@@ -432,6 +432,18 @@
             <el-button
               text
               size="small"
+              @click="toggleLike(comment)"
+              :class="{ 'is-liked': comment.is_liked }"
+              class="like-btn"
+            >
+              <svg class="like-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M2 20h2V8H2v12zm20-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1.49 1.49 0 0 0-.44-1.06L13.17 0 6.59 6.59A1.98 1.98 0 0 0 6 8v10a2 2 0 0 0 2 2h9a2 2 0 0 0 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73V9z"/>
+              </svg>
+              <span v-if="comment.like_count > 0" class="like-count">{{ comment.like_count }}</span>
+            </el-button>
+            <el-button
+              text
+              size="small"
               @click="toggleReplyInput(comment.id)"
               v-if="isLoggedIn()"
             >
@@ -501,6 +513,18 @@
                 
                 <!-- 操作按钮 -->
                 <div class="reply-actions">
+                  <el-button
+                    text
+                    size="small"
+                    @click="toggleLike(reply)"
+                    :class="{ 'is-liked': reply.is_liked }"
+                    class="like-btn"
+                  >
+                    <svg class="like-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                      <path d="M2 20h2V8H2v12zm20-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1.49 1.49 0 0 0-.44-1.06L13.17 0 6.59 6.59A1.98 1.98 0 0 0 6 8v10a2 2 0 0 0 2 2h9a2 2 0 0 0 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73V9z"/>
+                    </svg>
+                    <span v-if="reply.like_count > 0" class="like-count">{{ reply.like_count }}</span>
+                  </el-button>
                   <el-button
                     text
                     size="small"
@@ -1528,6 +1552,28 @@ const deleteComment = async (commentId) => {
   }
 };
 
+// 点赞/取消点赞评论
+const toggleLike = async (comment) => {
+  if (!isLoggedIn()) {
+    ElMessage.warning('请先登录');
+    router.push('/login');
+    return;
+  }
+  try {
+    if (comment.is_liked) {
+      await request.delete(`/comments/${comment.id}/like`);
+      comment.is_liked = false;
+      comment.like_count = Math.max(0, (comment.like_count || 1) - 1);
+    } else {
+      await request.post(`/comments/${comment.id}/like`);
+      comment.is_liked = true;
+      comment.like_count = (comment.like_count || 0) + 1;
+    }
+  } catch (error) {
+    console.error('点赞操作失败:', error);
+  }
+};
+
 // 为递归回复组件 ReplyNode 提供上下文
 provide('replyingTo', replyingTo);
 provide('replyContent', replyContent);
@@ -1539,6 +1585,7 @@ provide('getCurrentUserId', getCurrentUserId);
 provide('isLoggedIn', isLoggedIn);
 provide('editComment', editComment);
 provide('deleteComment', deleteComment);
+provide('toggleLike', toggleLike);
 
 // 打开认领对话框
 const openClaimDialog = () => {
@@ -2349,6 +2396,31 @@ const goToItem = (itemId) => {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-secondary, #909399);
+  transition: color 0.2s;
+}
+
+.like-btn:hover {
+  color: var(--color-accent, #409eff) !important;
+}
+
+.like-btn.is-liked {
+  color: var(--color-accent, #409eff) !important;
+}
+
+.like-icon {
+  vertical-align: middle;
+}
+
+.like-count {
+  font-size: 0.85rem;
+  margin-left: 0.1rem;
 }
 
 /* 回复输入框 */
