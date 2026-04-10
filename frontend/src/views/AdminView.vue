@@ -39,6 +39,9 @@
         <el-button type="success" v-if="meLevel" @click="openCreateItem"
           >创建物品</el-button
         >
+        <el-button v-if="meLevel" @click="handleAdminExport">
+          <el-icon><Download /></el-icon> 导出数据
+        </el-button>
       </div>
       <div v-else class="user-stats-header">
         <h2>数据统计</h2>
@@ -619,7 +622,7 @@ import request, { absoluteUrl, previewList, previewListMultiple } from "../utils
 import { getUser } from "../utils/auth";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Download } from "@element-plus/icons-vue";
 const router = useRouter();
 const tab = ref("users");
 const users = ref([]);
@@ -1057,6 +1060,31 @@ const prevAdminImage = () => {
 const nextAdminImage = () => {
   if (currentItem.value?.image_urls && currentAdminImageIndex.value < currentItem.value.image_urls.length - 1) {
     currentAdminImageIndex.value++;
+  }
+};
+
+const handleAdminExport = async () => {
+  try {
+    const response = await request.get("/admin/export", {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `管理员数据面板_${new Date().toISOString().split("T")[0]}.xlsx`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    ElMessage.success("导出成功！");
+  } catch (error) {
+    ElMessage.error("导出失败");
+    console.error("导出失败:", error);
   }
 };
 </script>

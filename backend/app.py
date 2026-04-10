@@ -3591,6 +3591,132 @@ def export_data():
         download_name=f'失物招领数据_{datetime.now().strftime("%Y%m%d")}.xlsx'
     )
 
+# 管理员数据面板导出
+@app.route('/api/admin/export', methods=['GET'])
+@jwt_required()
+def admin_export_data():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or user.role != 'admin' or not user.admin_level:
+        return jsonify({'message': 'forbidden'}), 403
+
+    wb = Workbook()
+
+    # ---- Sheet 1: 用户 ----
+    ws_users = wb.active
+    ws_users.title = "用户"
+    ws_users.append(['ID', '用户名', '邮箱', '手机号', '身份类型', '院系', '年级', '班级',
+                     '学号', '工号', '性别', '角色', '管理员等级', '是否封禁',
+                     '教师审核状态', '注册时间'])
+    gender_map = {'male': '男', 'female': '女', 'other': '其他', 'secret': '不透露'}
+    role_map = {'admin': '管理员', 'user': '普通用户'}
+    level_map = {'low': '低级', 'mid': '中级', 'high': '高级'}
+    user_type_map = {'student': '学生', 'teacher': '教师'}
+    approval_map = {'pending': '待审核', 'approved': '已通过', 'rejected': '已拒绝'}
+    for u in User.query.order_by(User.created_at.desc()).all():
+        ws_users.append([
+            u.id,
+            u.username,
+            u.email,
+            u.phone or '',
+            user_type_map.get(u.user_type, u.user_type or ''),
+            u.department or '',
+            u.grade or '',
+            u.class_name or '',
+            u.student_id or '',
+            u.staff_id or '',
+            gender_map.get(u.gender, '未填写'),
+            role_map.get(u.role, u.role or ''),
+            level_map.get(u.admin_level, '无'),
+            '是' if u.is_banned else '否',
+            approval_map.get(u.teacher_approval_status, '') if u.user_type == 'teacher' else '',
+            u.created_at.strftime('%Y-%m-%d %H:%M:%S') if u.created_at else ''
+        ])
+
+    # ---- Sheet 2: 物品 ----
+    ws_items = wb.create_sheet("物品")
+    ws_items.append(['ID', '标题', '描述', '类型', '物品类型', '地点', '联系人', '联系电话',
+                     '日期', '状态', '发布时间', '发布人'])
+    for item in Item.query.order_by(Item.created_at.desc()).all():
+        ws_items.append([
+            item.id,
+            item.title,
+            item.description,
+            '失物' if item.category == 'lost' else '拾物',
+            item.item_type,
+            item.location,
+            item.contact_name,
+            item.contact_phone,
+            item.date,
+            '进行中' if item.status == 'open' else '已解决',
+            item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else '',
+            item.user.username if item.user else ''
+        ])
+
+    # ---- Sheet 3: 举报 ----
+    ws_reports = wb.create_sheet("举报")
+    ws_reports.append(['ID', '举报类别', '严重级别', '状态', '说明', '被举报物品ID', '被举报物品标题',
+                       '举报用户', '被举报用户', '是否匿名', '处理备注', '创建时间'])
+    category_map = {'spam': '垃圾信息', 'abuse': '骚扰/辱骂', 'fake': '虚假信息', 'other': '其他'}
+    severity_map = {'low': '低', 'medium': '中', 'high': '高'}
+    status_map = {'open': '已举报', 'processing': '处理中', 'resolved': '已解决',
+                  'rejected': '已拒绝', 'withdrawn': '已撤回'}
+    for r in Report.query.order_by(Report.created_at.desc()).all():
+        reporter = User.query.get(r.reporter_id)
+        target_user = User.query.get(r.target_user_id) if r.target_user_id else None
+        reported_item = Item.query.get(r.item_id) if r.item_id else None
+        ws_reports.append([
+            r.id,
+            category_map.get(r.category, r.category or ''),
+            severity_map.get(r.severity, r.severity or ''),
+            status_map.get(r.status, r.status or ''),
+            r.description or '',
+            r.item_id or '',
+            reported_item.title if reported_item else '',
+            reporter.username if reporter else '',
+            target_user.username if target_user else '',
+            '是' if r.anonymous else '否',
+            r.resolution_note or '',
+            r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else ''
+        ])
+
+    # ---- Sheet 4: 统计 ----
+    ws_stats = wb.create_sheet("统计")
+    ws_stats.append(['统计项', '数值'])
+    ws_stats.append(['用户总数', User.query.count()])
+    ws_stats.append(['物品总数', Item.query.count()])
+    ws_stats.append(['失物数量', Item.query.filter_by(category='lost').count()])
+    ws_stats.append(['拾物数量', Item.query.filter_by(category='found').count()])
+    ws_stats.append(['已解决数量', Item.query.filter_by(status='closed').count()])
+    ws_stats.append(['未处理举报', Report.query.filter_by(status='open').count()])
+
+    # ---- Sheet 5: 教师审核（仅高级管理员）----
+    if user.admin_level == 'high':
+        ws_teachers = wb.create_sheet("教师审核")
+        ws_teachers.append(['ID', '用户名', '邮箱', '工号', '院系', '审核状态', '注册时间'])
+        teachers = User.query.filter_by(user_type='teacher').order_by(User.created_at.desc()).all()
+        for t in teachers:
+            ws_teachers.append([
+                t.id,
+                t.username,
+                t.email,
+                t.staff_id or '',
+                t.department or '',
+                approval_map.get(t.teacher_approval_status, t.teacher_approval_status or ''),
+                t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else ''
+            ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'管理员数据面板_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
+
 # ==================== WebSocket 事件处理 ====================
 
 @socketio.on('connect')
