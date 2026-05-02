@@ -9,6 +9,8 @@
             </el-avatar>
           </div>
           <h2>{{ user?.username }}</h2>
+          <el-tag v-if="user?.role === 'admin'" class="role-badge" type="success">管理员</el-tag>
+          <el-tag v-else-if="user?.role === 'super_admin'" class="role-badge" type="warning">高级管理员</el-tag>
           <p class="join-date">加入于 {{ user?.created_at }}</p>
           <p class="join-date">当前年级：{{ user?.grade_display || user?.grade || '未设置' }}</p>
           <el-upload
@@ -25,6 +27,14 @@
               {{ user?.avatar_url ? '修改头像' : '上传头像' }}
             </button>
           </el-upload>
+          <button
+            v-if="showAdminApplicationButton"
+            class="admin-application-btn"
+            :class="{ muted: !adminApplicationState.can_apply }"
+            @click="handleAdminApplicationClick"
+          >
+            {{ adminApplicationButtonText }}
+          </button>
         </el-card>
       </el-col>
 
@@ -56,7 +66,7 @@
             <el-form-item label="院系">
               <el-input v-model="form.department" />
             </el-form-item>
-            <el-form-item v-if="user?.user_type !== 'teacher'" label="年级">
+            <el-form-item label="年级">
               <el-select v-model="form.grade" placeholder="选择年级">
                 <el-option label="大一" value="大一" />
                 <el-option label="大二" value="大二" />
@@ -64,10 +74,10 @@
                 <el-option label="大四" value="大四" />
               </el-select>
             </el-form-item>
-            <el-form-item v-if="user?.user_type !== 'teacher'" label="班级">
+            <el-form-item label="班级">
               <el-input v-model="form.class_name" />
             </el-form-item>
-            <el-form-item :label="user?.user_type === 'teacher' ? '工号' : '学号'">
+            <el-form-item label="学号">
               <el-input v-model="form.student_id" />
             </el-form-item>
             <el-form-item label="性别">
@@ -125,11 +135,29 @@
         </el-card>
       </el-col>
     </el-row>
+    <el-dialog v-model="adminApplicationDialog" title="申请管理员" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="申请理由">
+          <el-input
+            v-model="adminApplicationReason"
+            type="textarea"
+            :rows="5"
+            maxlength="300"
+            show-word-limit
+            placeholder="请填写申请理由，至少 20 字"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adminApplicationDialog = false">取消</el-button>
+        <el-button type="primary" :loading="adminApplicationLoading" @click="submitAdminApplication">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request, { apiOrigin, absoluteUrl } from '../utils/request'
@@ -143,6 +171,15 @@ const privacy = reactive({ visibility_setting: 'public', others_policy: 'show', 
 const showList = ref([])
 const hideList = ref([])
 const conversations = ref([])
+const adminApplicationDialog = ref(false)
+const adminApplicationReason = ref('')
+const adminApplicationLoading = ref(false)
+const adminApplicationState = ref({
+  can_apply: true,
+  block_message: '',
+  latest_application: null,
+  next_apply_time: null
+})
 
 const form = reactive({
   email: '',
@@ -191,6 +228,12 @@ const rules = {
   ]
 }
 
+const showAdminApplicationButton = computed(() => user.value?.role === 'user')
+const adminApplicationButtonText = computed(() => {
+  if (adminApplicationState.value.latest_application?.status === 'pending') return '审核中'
+  return '申请管理员'
+})
+
 const loadProfile = async () => {
   try {
     user.value = await request.get('/auth/profile')
@@ -206,6 +249,9 @@ const loadProfile = async () => {
     privacy.visibility_setting = p.visibility_setting
     privacy.others_policy = p.others_policy
     privacy.rules = p.rules
+    if (user.value?.role === 'user') {
+      adminApplicationState.value = await request.get('/admin-application/my')
+    }
   } catch (error) {
     console.error('加载个人资料失败:', error)
   }
@@ -225,15 +271,9 @@ const handleUpdate = async () => {
         department: form.department,
         gender: form.gender
       }
-      // 只有学生才更新年级、班级和学号
-      if (user.value?.user_type !== 'teacher') {
-        updateData.grade = form.grade
-        updateData.class_name = form.class_name
-        updateData.student_id = form.student_id
-      } else {
-        // 教师只更新工号（存储在 student_id 字段中）
-        updateData.student_id = form.student_id
-      }
+      updateData.grade = form.grade
+      updateData.class_name = form.class_name
+      updateData.student_id = form.student_id
       if (form.password) {
         updateData.password = form.password
       }
@@ -252,6 +292,34 @@ const handleUpdate = async () => {
       loading.value = false
     }
   })
+}
+
+const handleAdminApplicationClick = () => {
+  if (!adminApplicationState.value.can_apply) {
+    ElMessage.warning(adminApplicationState.value.block_message || '申请审核中，请耐心等待')
+    return
+  }
+  adminApplicationReason.value = ''
+  adminApplicationDialog.value = true
+}
+
+const submitAdminApplication = async () => {
+  const reason = adminApplicationReason.value.trim()
+  if (reason.length < 20) {
+    ElMessage.warning('申请理由至少 20 字')
+    return
+  }
+  adminApplicationLoading.value = true
+  try {
+    await request.post('/admin-application', { reason })
+    ElMessage.success('申请已提交')
+    adminApplicationDialog.value = false
+    adminApplicationState.value = await request.get('/admin-application/my')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '提交失败')
+  } finally {
+    adminApplicationLoading.value = false
+  }
 }
 
 const openPrivacyRules = async () => {
@@ -344,6 +412,11 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.role-badge {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
 /* 移除 Element Plus 默认的输入框包装器样式 */
 .profile-card :deep(.el-input),
 .profile-card :deep(.el-select) {
@@ -426,6 +499,26 @@ onMounted(() => {
 
 .avatar-uploader {
   margin-top: 1rem;
+}
+
+.admin-application-btn {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.55rem 1.25rem;
+  background: var(--color-card);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--shadow-color);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.admin-application-btn.muted {
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 /* ========== 移动端个人中心排版 ========== */

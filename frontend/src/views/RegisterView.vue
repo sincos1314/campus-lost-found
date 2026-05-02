@@ -4,43 +4,17 @@
       <template #header>
         <div class="card-header">
           <el-icon :size="40" color="#667eea"><Avatar /></el-icon>
-          <h2 v-if="identity==='student'">学生注册</h2>
-          <h2 v-else-if="identity==='teacher'">教师注册</h2>
-          <h2 v-else>选择身份</h2>
+          <h2>用户注册</h2>
         </div>
       </template>
 
-      <div v-if="!identity" class="identity-select">
-        <el-select v-model="identity" placeholder="您的身份是：" style="width:100%">
-          <el-option label="教师" value="teacher" />
-          <el-option label="学生" value="student" />
-        </el-select>
-        <div style="margin-top:16px; text-align:center">
-          <el-button type="primary" :disabled="!identity">下一步</el-button>
-        </div>
-      </div>
-
-      <el-form v-else
+      <el-form
         ref="registerFormRef"
         :model="registerForm"
         :rules="rules"
         label-width="80px"
         size="large"
       >
-        <template v-if="identity==='teacher'">
-          <el-alert
-            type="info"
-            :closable="false"
-            style="margin-bottom: 20px"
-          >
-            <template #title>
-              <span>教师注册需要管理员审核，审核通过后即可使用系统</span>
-            </template>
-          </el-alert>
-          <el-form-item label="工号" prop="staff_id">
-            <el-input v-model="registerForm.staff_id" placeholder="请输入工号" />
-          </el-form-item>
-        </template>
         <el-form-item label="用户名" prop="username">
           <el-input
             v-model="registerForm.username"
@@ -65,33 +39,31 @@
           />
         </el-form-item>
 
-        <template v-if="identity==='student'">
-          <el-form-item label="院系" prop="department">
-            <el-input v-model="registerForm.department" placeholder="请输入院系" />
-          </el-form-item>
-          <el-form-item label="年级" prop="grade">
-            <el-select v-model="registerForm.grade" placeholder="请选择年级">
-              <el-option label="大一" value="大一" />
-              <el-option label="大二" value="大二" />
-              <el-option label="大三" value="大三" />
-              <el-option label="大四" value="大四" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="班级" prop="class_name">
-            <el-input v-model="registerForm.class_name" placeholder="请输入班级" />
-          </el-form-item>
-          <el-form-item label="学号" prop="student_id">
-            <el-input v-model="registerForm.student_id" placeholder="请输入学号" />
-          </el-form-item>
-          <el-form-item label="性别" prop="gender">
-            <el-select v-model="registerForm.gender" placeholder="选择性别(可选)">
-              <el-option label="男" value="male" />
-              <el-option label="女" value="female" />
-              <el-option label="其他" value="other" />
-              <el-option label="不透露" value="secret" />
-            </el-select>
-          </el-form-item>
-        </template>
+        <el-form-item label="院系" prop="department">
+          <el-input v-model="registerForm.department" placeholder="请输入院系" />
+        </el-form-item>
+        <el-form-item label="年级" prop="grade">
+          <el-select v-model="registerForm.grade" placeholder="请选择年级">
+            <el-option label="大一" value="大一" />
+            <el-option label="大二" value="大二" />
+            <el-option label="大三" value="大三" />
+            <el-option label="大四" value="大四" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="班级" prop="class_name">
+          <el-input v-model="registerForm.class_name" placeholder="请输入班级" />
+        </el-form-item>
+        <el-form-item label="学号" prop="student_id">
+          <el-input v-model="registerForm.student_id" placeholder="请输入学号" />
+        </el-form-item>
+        <el-form-item label="性别" prop="gender">
+          <el-select v-model="registerForm.gender" placeholder="选择性别(可选)">
+            <el-option label="男" value="male" />
+            <el-option label="女" value="female" />
+            <el-option label="其他" value="other" />
+            <el-option label="不透露" value="secret" />
+          </el-select>
+        </el-form-item>
 
         <el-form-item label="密码" prop="password">
           <el-input
@@ -143,7 +115,6 @@ const router = useRouter()
 const registerFormRef = ref()
 const loading = ref(false)
 
-const identity = ref('')
 const registerForm = reactive({
   username: '',
   email: '',
@@ -154,8 +125,7 @@ const registerForm = reactive({
   grade: '大一',
   class_name: '',
   student_id: '',
-  gender: '',
-  staff_id: ''
+  gender: ''
 })
 
 const validateConfirmPassword = (rule, value, callback) => {
@@ -177,9 +147,6 @@ const rules = {
   ],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
-  ],
-  staff_id: [
-    { required: identity.value==='teacher', message: '请输入工号', trigger: 'blur' }
   ],
   department: [{ required: true, message: '请输入院系', trigger: 'blur' }],
   grade: [{ required: true, message: '请选择年级', trigger: ['blur','change'] }],
@@ -208,20 +175,13 @@ const handleRegister = async () => {
         email: registerForm.email,
         phone: registerForm.phone,
         password: registerForm.password,
-        department: identity.value==='student' ? registerForm.department : '',
-        grade: identity.value==='student' ? registerForm.grade : '',
-        class_name: identity.value==='student' ? registerForm.class_name : '',
-        student_id: identity.value==='student' ? registerForm.student_id : '',
-        gender: identity.value==='student' ? registerForm.gender : '',
-        identity: identity.value || 'student',
-        staff_id: identity.value==='teacher' ? registerForm.staff_id : ''
+        department: registerForm.department,
+        grade: registerForm.grade,
+        class_name: registerForm.class_name,
+        student_id: registerForm.student_id,
+        gender: registerForm.gender
       })
-      
-      if (response.requires_approval) {
-        ElMessage.success('注册成功！您的账户正在等待管理员审核，审核通过后即可登录使用')
-      } else {
-        ElMessage.success('注册成功！请登录')
-      }
+      ElMessage.success(response.message || '注册成功！请登录')
       router.push('/login')
     } catch (error) {
       console.error('注册失败:', error)

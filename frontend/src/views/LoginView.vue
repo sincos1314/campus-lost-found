@@ -135,15 +135,7 @@ const handleLogin = async () => {
     } catch (error) {
       const errorData = error?.response?.data || {}
       const msg = errorData.message || '登录失败，请重试'
-      
-      // 如果是审核相关错误，显示更详细的提示
-      if (errorData.requires_approval) {
-        ElMessage.warning(msg)
-      } else if (errorData.approval_rejected) {
-        ElMessage.error(msg)
-      } else {
-        ElMessage.error(msg)
-      }
+      ElMessage.error(msg)
     } finally {
       loading.value = false
     }

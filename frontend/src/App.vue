@@ -92,7 +92,7 @@
               class="nav-link"
               :class="{ active: isActiveRoute('/admin') }"
               @click="goToDashboard"
-              v-if="isLoggedInComputed && user?.role === 'admin'"
+              v-if="isLoggedInComputed && (user?.role === 'admin' || user?.role === 'super_admin')"
             >
               <el-icon><DataAnalysis /></el-icon>
               数据看板
@@ -196,7 +196,7 @@
             <el-icon><DocumentChecked /></el-icon>
             <span>认领管理</span>
           </button>
-          <button v-if="isLoggedInComputed && user?.role === 'admin'" class="drawer-link" :class="{ active: isActiveRoute('/admin') }" @click="navAndClose(goToDashboard)">
+          <button v-if="isLoggedInComputed && (user?.role === 'admin' || user?.role === 'super_admin')" class="drawer-link" :class="{ active: isActiveRoute('/admin') }" @click="navAndClose(goToDashboard)">
             <el-icon><DataAnalysis /></el-icon>
             <span>数据看板</span>
           </button>

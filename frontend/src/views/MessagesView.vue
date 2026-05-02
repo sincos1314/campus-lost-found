@@ -35,7 +35,8 @@
             <div class="top-line">
               <span class="username">
                 {{ conv.other_user.username }}
-                <el-tag v-if="conv.other_user.role==='admin'" type="success" size="small" style="margin-left:6px">{{ levelText(conv.other_user.admin_level) }}</el-tag>
+                <el-tag v-if="conv.other_user.role==='super_admin'" type="warning" size="small" style="margin-left:6px">高级管理员</el-tag>
+                <el-tag v-else-if="conv.other_user.role==='admin'" type="success" size="small" style="margin-left:6px">管理员</el-tag>
               </span>
               <span class="time">{{ formatTime(conv.last_message_time) }}</span>
             </div>
@@ -65,7 +66,6 @@ import { getUser } from '../utils/auth'
 const router = useRouter()
 const conversations = ref([])
 const me = getUser()
-const levelText = (l) => ({ low:'低级', mid:'中级', high:'高级' }[l] || '管理员')
 
 // 计算未读总数
 const totalUnread = computed(() => {

@@ -37,6 +37,12 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
+ROLE_USER = 'user'
+ROLE_ADMIN = 'admin'
+ROLE_SUPER_ADMIN = 'super_admin'
+ADMIN_APPLICATION_STATUSES = ('pending', 'approved', 'rejected', 'revoked')
+ADMIN_REAPPLY_COOLDOWN = timedelta(hours=24)
+
 # 敏感词列表（中英文）- 以多字词/短语为主，避免单字误伤（如曹操、日本、生日、干活、打球等）
 SENSITIVE_WORDS = [
     # 中文敏感词（短语优先，不含易误伤单字如操/日/干/打/死/杀/骗/偷/抢/盗/性/淫/骚/贱）
@@ -170,14 +176,9 @@ class User(db.Model):
     class_name = db.Column(db.String(50))
     student_id = db.Column(db.String(50))
     gender = db.Column(db.String(20))
-    role = db.Column(db.String(20), default='user')
-    admin_level = db.Column(db.String(20))
-    admin_appointed_by = db.Column(db.Integer)
+    role = db.Column(db.String(20), default=ROLE_USER)
     is_banned = db.Column(db.Boolean, default=False)
     banned_by = db.Column(db.Integer)
-    user_type = db.Column(db.String(20))  # 学生/教师
-    staff_id = db.Column(db.String(50))   # 工号（教师）
-    teacher_approval_status = db.Column(db.String(20), default='approved')  # 教师审核状态: pending/approved/rejected
     visibility_setting = db.Column(db.String(20), default='public')
     others_policy = db.Column(db.String(20), default='show')
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -242,13 +243,8 @@ class User(db.Model):
             'student_id': self.student_id,
             'gender': self.gender,
             'role': self.role,
-            'admin_level': self.admin_level,
-            'admin_appointed_by': self.admin_appointed_by,
             'is_banned': bool(self.is_banned),
             'banned_by': self.banned_by,
-            'user_type': self.user_type,
-            'staff_id': self.staff_id,
-            'teacher_approval_status': self.teacher_approval_status or 'approved',
             'visibility_setting': self.visibility_setting,
             'others_policy': self.others_policy,
             'grade_display': compute_grade_display(),
@@ -327,6 +323,51 @@ class Notification(db.Model):
             'related_item_id': self.related_item_id
         }
 
+class AdminApplication(db.Model):
+    __tablename__ = 'admin_application'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    apply_time = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    review_time = db.Column(db.DateTime)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    reject_reason = db.Column(db.Text)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='admin_applications')
+    reviewer = db.relationship('User', foreign_keys=[reviewer_id])
+
+    __table_args__ = (
+        db.CheckConstraint("status IN ('pending', 'approved', 'rejected', 'revoked')", name='ck_admin_application_status'),
+        db.CheckConstraint(
+            "length(reason) >= 20 OR reason = '高级管理员直接任命' OR status = 'revoked'",
+            name='ck_admin_application_reason_length'
+        ),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'reason': self.reason,
+            'status': self.status,
+            'apply_time': self.apply_time.strftime('%Y-%m-%d %H:%M:%S') if self.apply_time else None,
+            'review_time': self.review_time.strftime('%Y-%m-%d %H:%M:%S') if self.review_time else None,
+            'reviewer_id': self.reviewer_id,
+            'reject_reason': self.reject_reason,
+            'user': {
+                'id': self.user.id,
+                'username': self.user.username,
+                'email': self.user.email,
+                'avatar_url': f'/api/avatar/{self.user.avatar_path}' if self.user.avatar_path else None,
+                'role': self.user.role
+            } if self.user else None,
+            'reviewer': {
+                'id': self.reviewer.id,
+                'username': self.reviewer.username
+            } if self.reviewer else None
+        }
+
 class Message(db.Model):
     """消息表 - 记录具体的聊天消息"""
     id = db.Column(db.Integer, primary_key=True)
@@ -402,8 +443,7 @@ class Conversation(db.Model):
             'other_user': {
                 'id': other_user.id,
                 'username': other_user.username,
-                'role': other_user.role,
-                'admin_level': other_user.admin_level
+                'role': other_user.role
             },
             'last_message': self.last_message,
             'last_message_time': self.last_message_time.strftime('%Y-%m-%d %H:%M:%S') if self.last_message_time else None,
@@ -588,13 +628,8 @@ with app.app_context():
             ('student_id', 'TEXT'),
             ('gender', 'TEXT'),
             ('role', 'TEXT'),
-            ('admin_level', 'TEXT'),
-            ('admin_appointed_by', 'INTEGER'),
             ('is_banned', 'INTEGER'),
             ('banned_by', 'INTEGER'),
-            ('user_type', 'TEXT'),
-            ('staff_id', 'TEXT'),
-            ('teacher_approval_status', 'TEXT'),
             ('visibility_setting', 'TEXT'),
             ('others_policy', 'TEXT')
         ]:
@@ -640,6 +675,44 @@ with app.app_context():
         print('✅ Item 表迁移成功：已添加 images_path 字段')
     except Exception as e:
         print(f'item migration skipped: {e}')
+
+    try:
+        import sqlite3
+        conn = sqlite3.connect(os.path.join(basedir, 'lost_found.db'))
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(user)")
+        cols = [row[1] for row in cur.fetchall()]
+        if 'admin_level' in cols:
+            cur.execute("UPDATE user SET role = ? WHERE role = 'admin' AND admin_level = 'high'", (ROLE_SUPER_ADMIN,))
+            cur.execute("UPDATE user SET role = ? WHERE role = 'admin' AND admin_level = 'mid'", (ROLE_ADMIN,))
+            cur.execute("UPDATE user SET role = ? WHERE role = 'admin' AND admin_level = 'low'", (ROLE_USER,))
+            cur.execute("UPDATE user SET role = ? WHERE role = 'super_admin'", (ROLE_SUPER_ADMIN,))
+            cur.execute("UPDATE user SET role = ? WHERE role NOT IN (?, ?, ?)", (ROLE_USER, ROLE_USER, ROLE_ADMIN, ROLE_SUPER_ADMIN))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f'role normalization skipped: {e}')
+
+    try:
+        super_count = User.query.filter_by(role=ROLE_SUPER_ADMIN).count()
+        if super_count == 0:
+            username = os.getenv('DEFAULT_SUPER_ADMIN_USERNAME', 'super_admin')
+            email = os.getenv('DEFAULT_SUPER_ADMIN_EMAIL', 'super_admin@example.com')
+            password = os.getenv('DEFAULT_SUPER_ADMIN_PASSWORD', 'admin123456')
+            seed = User.query.filter_by(username=username).first()
+            if seed:
+                seed.role = ROLE_SUPER_ADMIN
+            else:
+                seed = User(username=username, email=email, role=ROLE_SUPER_ADMIN)
+                seed.set_password(password)
+                db.session.add(seed)
+            db.session.commit()
+            print(f'✅ 已初始化高级管理员账号：{username}')
+        elif super_count > 1:
+            print(f'⚠️ 当前高级管理员数量为 {super_count}，请运行迁移脚本校验并保留唯一账号')
+    except Exception as e:
+        db.session.rollback()
+        print(f'super admin seed skipped: {e}')
     
     # 创建新表（如果不存在）
     try:
@@ -818,8 +891,6 @@ def register():
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'message': '邮箱已被注册'}), 400
     
-    # 创建新用户
-    identity = (data.get('identity') or 'student').strip()
     user = User(
         username=data['username'],
         email=data['email'],
@@ -829,48 +900,19 @@ def register():
         class_name=data.get('class_name', ''),
         student_id=data.get('student_id', ''),
         gender=data.get('gender', ''),
-        user_type=identity,
-        staff_id=data.get('staff_id', '')
+        role=ROLE_USER
     )
     user.set_password(data['password'])
-    
-    # 教师需要审核，学生直接通过
-    if identity == 'teacher':
-        user.role = 'user'  # 先设为普通用户
-        user.admin_level = None
-        user.admin_appointed_by = None
-        user.teacher_approval_status = 'pending'  # 待审核
-    else:
-        user.teacher_approval_status = 'approved'  # 学生直接通过
-    
     db.session.add(user)
     db.session.commit()
-    
-    # 如果是教师，通知高级管理员审核
-    if identity == 'teacher':
-        # 查找所有高级管理员
-        high_admins = User.query.filter_by(role='admin', admin_level='high').all()
-        for admin in high_admins:
-            create_notification(
-                admin.id,
-                '新教师注册待审核',
-                f'教师 {user.username} ({user.email}) 申请注册，请前往管理员页面审核。',
-                'warning'
-            )
-        return jsonify({
-            'message': '注册成功，您的账户正在等待管理员审核，审核通过后即可使用',
-            'user': user.to_dict(),
-            'requires_approval': True
-        }), 201
-    else:
-        # 学生直接创建欢迎通知
-        create_notification(
-            user.id,
-            '欢迎加入校园失物招领系统！',
-            f'你好 {user.username}，欢迎使用我们的系统。你可以在这里发布和查找失物信息。',
-            'success'
-        )
-        return jsonify({'message': '注册成功', 'user': user.to_dict()}), 201
+
+    create_notification(
+        user.id,
+        '欢迎加入校园失物招领系统！',
+        f'你好 {user.username}，欢迎使用我们的系统。你可以在这里发布和查找失物信息。',
+        'success'
+    )
+    return jsonify({'message': '注册成功', 'user': user.to_dict()}), 201
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -880,19 +922,6 @@ def login():
     
     if not user or not user.check_password(data['password']):
         return jsonify({'message': '用户名或密码错误'}), 401
-    
-    # 检查教师审核状态
-    if user.user_type == 'teacher' and user.teacher_approval_status == 'pending':
-        return jsonify({
-            'message': '您的账户正在等待管理员审核，审核通过后即可登录',
-            'requires_approval': True
-        }), 403
-    
-    if user.user_type == 'teacher' and user.teacher_approval_status == 'rejected':
-        return jsonify({
-            'message': '您的注册申请已被拒绝，如有疑问请联系管理员',
-            'approval_rejected': True
-        }), 403
     
     access_token = create_access_token(identity=str(user.id))
     return jsonify({
@@ -1058,7 +1087,7 @@ def create_report():
     db.session.add(report)
     db.session.commit()
 
-    admins = User.query.filter_by(role='admin').all()
+    admins = User.query.filter(User.role.in_([ROLE_ADMIN, ROLE_SUPER_ADMIN])).all()
     cat_map = {'spam': '垃圾信息', 'abuse': '骚扰/辱骂', 'fake': '虚假信息', 'other': '其他'}
     sev_map = {'low': '低', 'medium': '中', 'high': '高'}
     for admin in admins:
@@ -1877,7 +1906,7 @@ def admin_required():
     try:
         uid = int(get_jwt_identity())
         user = User.query.get(uid)
-        return user and user.role == 'admin'
+        return user and user.role in (ROLE_ADMIN, ROLE_SUPER_ADMIN)
     except:
         return False
 
@@ -1888,43 +1917,68 @@ def get_current_user():
     except:
         return None
 
-level_rank = {'low': 1, 'mid': 2, 'high': 3}
-
 def is_admin_user(u):
-    return bool(u and u.role == 'admin' and (u.admin_level in level_rank))
+    return bool(u and u.role in (ROLE_ADMIN, ROLE_SUPER_ADMIN))
+
+def is_super_admin(u):
+    return bool(u and u.role == ROLE_SUPER_ADMIN)
 
 def can_ban_or_delete(current_admin, target_user):
     if not is_admin_user(current_admin):
         return False
-    if current_admin.admin_level == 'low':
+    if not target_user or target_user.role == ROLE_SUPER_ADMIN:
         return False
-    if is_admin_user(target_user):
-        return level_rank[current_admin.admin_level] > level_rank[target_user.admin_level]
-    return True
+    if target_user.role == ROLE_ADMIN:
+        return is_super_admin(current_admin)
+    return current_admin.role in (ROLE_ADMIN, ROLE_SUPER_ADMIN)
 
 def can_mark_item_status(current_admin):
-    return is_admin_user(current_admin) and current_admin.admin_level in ['mid', 'high']
+    return is_admin_user(current_admin)
 
 def can_create_user_or_item(current_admin):
     return is_admin_user(current_admin)
 
-def can_appoint_level(current_admin, level):
-    if not is_admin_user(current_admin):
-        return False
-    if level == 'low':
-        return current_admin.admin_level in ['mid', 'high']
-    if level == 'mid':
-        return current_admin.admin_level == 'high'
-    return False
+def can_appoint_admin(current_admin, target_user):
+    return is_super_admin(current_admin) and target_user and target_user.role == ROLE_USER
 
-def can_revoke(current_admin, target_user):
-    if not is_admin_user(current_admin) or not is_admin_user(target_user):
-        return False
-    if target_user.admin_level == 'low':
-        return current_admin.admin_level in ['mid', 'high']
-    if target_user.admin_level == 'mid':
-        return current_admin.admin_level == 'high'
-    return False
+def can_revoke_admin(current_admin, target_user):
+    return is_super_admin(current_admin) and target_user and target_user.role == ROLE_ADMIN
+
+def role_text(role):
+    return {
+        ROLE_USER: '普通用户',
+        ROLE_ADMIN: '管理员',
+        ROLE_SUPER_ADMIN: '高级管理员'
+    }.get(role or ROLE_USER, '普通用户')
+
+def latest_admin_application(user_id):
+    return AdminApplication.query.filter_by(user_id=user_id).order_by(AdminApplication.apply_time.desc()).first()
+
+def admin_application_state(user):
+    latest = latest_admin_application(user.id)
+    now = datetime.now()
+    can_apply = user.role == ROLE_USER
+    next_apply_time = None
+    block_message = ''
+    if user.role != ROLE_USER:
+        return latest, False, None, '已是管理员，无需申请'
+    if latest and latest.status == 'pending':
+        return latest, False, None, '申请审核中，请耐心等待'
+    if latest and latest.status in ('rejected', 'revoked'):
+        base_time = latest.review_time or latest.apply_time
+        next_apply = base_time + ADMIN_REAPPLY_COOLDOWN
+        if now < next_apply:
+            can_apply = False
+            next_apply_time = next_apply
+            remaining = next_apply - now
+            total_minutes = max(1, int(remaining.total_seconds() // 60))
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+            if latest.status == 'revoked':
+                block_message = f'您的管理员身份刚被撤销，请在 {hours} 小时 {minutes} 分钟后重新申请'
+            else:
+                block_message = f'上次申请被拒绝，请在 {hours} 小时 {minutes} 分钟后重新申请'
+    return latest, can_apply, next_apply_time, block_message
 
 @app.route('/api/admin/users', methods=['GET'])
 @jwt_required()
@@ -1957,7 +2011,7 @@ def admin_user_ban(user_id):
             'warning'
         )
     else:
-        if not is_admin_user(current_admin) or current_admin.admin_level not in ['mid', 'high']:
+        if not is_admin_user(current_admin):
             return jsonify({'message': 'forbidden'}), 403
         user.is_banned = False
         user.banned_by = None
@@ -2280,96 +2334,120 @@ def admin_stats():
         'reports_open': Report.query.filter_by(status='open').count()
     })
 
-@app.route('/api/admin/teachers/pending', methods=['GET'])
+@app.route('/api/admin-application', methods=['POST'])
 @jwt_required()
-def get_pending_teachers():
-    """获取待审核的教师列表（仅高级管理员）"""
-    current_admin = get_current_user()
-    if not admin_required() or current_admin.admin_level != 'high':
+def submit_admin_application():
+    user = get_current_user()
+    if not user:
         return jsonify({'message': 'forbidden'}), 403
-    
-    pending_teachers = User.query.filter_by(
-        user_type='teacher',
-        teacher_approval_status='pending'
-    ).order_by(User.created_at.desc()).all()
-    
-    return jsonify([user.to_dict() for user in pending_teachers])
-
-@app.route('/api/admin/teachers/<int:teacher_id>/approve', methods=['POST'])
-@jwt_required()
-def approve_teacher(teacher_id):
-    """批准教师注册（仅高级管理员）"""
-    current_admin = get_current_user()
-    if not admin_required() or current_admin.admin_level != 'high':
-        return jsonify({'message': 'forbidden'}), 403
-    
-    teacher = User.query.get_or_404(teacher_id)
-    if teacher.user_type != 'teacher':
-        return jsonify({'message': '该用户不是教师'}), 400
-    
-    if teacher.teacher_approval_status != 'pending':
-        return jsonify({'message': '该教师已审核'}), 400
-    
-    # 批准：设置为管理员
-    teacher.teacher_approval_status = 'approved'
-    teacher.role = 'admin'
-    teacher.admin_level = 'mid'
-    teacher.admin_appointed_by = current_admin.id
-    
+    if user.role != ROLE_USER:
+        return jsonify({'message': '已是管理员，无需申请'}), 400
+    latest, can_apply, next_apply_time, block_message = admin_application_state(user)
+    if not can_apply:
+        return jsonify({
+            'message': block_message or '当前不可提交申请',
+            'can_apply': False,
+            'next_apply_time': next_apply_time.strftime('%Y-%m-%d %H:%M:%S') if next_apply_time else None
+        }), 400
+    data = request.json or {}
+    reason = (data.get('reason') or '').strip()
+    if len(reason) < 20:
+        return jsonify({'message': '申请理由至少 20 字'}), 400
+    application = AdminApplication(user_id=user.id, reason=reason, status='pending')
+    db.session.add(application)
     db.session.commit()
-    
-    # 通知教师审核通过
+
+    super_admins = User.query.filter_by(role=ROLE_SUPER_ADMIN).all()
+    for admin in super_admins:
+        create_notification(
+            admin.id,
+            '新的管理员申请',
+            f'{user.username} 提交了管理员申请，请前往管理员后台审核。',
+            'warning'
+        )
+    return jsonify(application.to_dict()), 201
+
+@app.route('/api/admin-application/my', methods=['GET'])
+@jwt_required()
+def my_admin_application():
+    user = get_current_user()
+    if not user:
+        return jsonify({'message': 'forbidden'}), 403
+    latest, can_apply, next_apply_time, block_message = admin_application_state(user)
+    return jsonify({
+        'role': user.role,
+        'can_apply': can_apply,
+        'next_apply_time': next_apply_time.strftime('%Y-%m-%d %H:%M:%S') if next_apply_time else None,
+        'block_message': block_message,
+        'latest_application': latest.to_dict() if latest else None
+    })
+
+@app.route('/api/admin-application', methods=['GET'])
+@jwt_required()
+def list_admin_applications():
+    current_admin = get_current_user()
+    if not is_super_admin(current_admin):
+        return jsonify({'message': 'forbidden'}), 403
+    status = request.args.get('status', 'pending')
+    query = AdminApplication.query
+    if status:
+        if status not in ADMIN_APPLICATION_STATUSES:
+            return jsonify({'message': '无效状态'}), 400
+        query = query.filter_by(status=status)
+    applications = query.order_by(AdminApplication.apply_time.desc()).all()
+    return jsonify([application.to_dict() for application in applications])
+
+@app.route('/api/admin-application/<int:application_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_admin_application(application_id):
+    current_admin = get_current_user()
+    if not is_super_admin(current_admin):
+        return jsonify({'message': 'forbidden'}), 403
+    application = AdminApplication.query.get_or_404(application_id)
+    if application.status != 'pending':
+        return jsonify({'message': '该申请已处理'}), 400
+    applicant = User.query.get_or_404(application.user_id)
+    if applicant.role != ROLE_USER:
+        return jsonify({'message': '申请人已不是普通用户'}), 400
+    application.status = 'approved'
+    application.review_time = datetime.now()
+    application.reviewer_id = current_admin.id
+    applicant.role = ROLE_ADMIN
+    db.session.commit()
     create_notification(
-        teacher.id,
-        '注册审核通过',
-        f'恭喜！您的教师账户已通过审核，现在可以使用系统了。',
+        applicant.id,
+        '管理员申请已通过',
+        '您的管理员申请已通过，您现在是管理员了。',
         'success'
     )
-    
-    return jsonify({
-        'message': '审核通过',
-        'user': teacher.to_dict()
-    })
+    return jsonify(application.to_dict())
 
-@app.route('/api/admin/teachers/<int:teacher_id>/reject', methods=['POST'])
+@app.route('/api/admin-application/<int:application_id>/reject', methods=['POST'])
 @jwt_required()
-def reject_teacher(teacher_id):
-    """拒绝教师注册（仅高级管理员）"""
+def reject_admin_application(application_id):
     current_admin = get_current_user()
-    if not admin_required() or current_admin.admin_level != 'high':
+    if not is_super_admin(current_admin):
         return jsonify({'message': 'forbidden'}), 403
-    
-    teacher = User.query.get_or_404(teacher_id)
-    if teacher.user_type != 'teacher':
-        return jsonify({'message': '该用户不是教师'}), 400
-    
-    if teacher.teacher_approval_status != 'pending':
-        return jsonify({'message': '该教师已审核'}), 400
-    
+    application = AdminApplication.query.get_or_404(application_id)
+    if application.status != 'pending':
+        return jsonify({'message': '该申请已处理'}), 400
     data = request.json or {}
-    reason = data.get('reason', '')
-    
-    # 拒绝
-    teacher.teacher_approval_status = 'rejected'
-    teacher.role = 'user'  # 保持为普通用户
-    
+    reject_reason = (data.get('reject_reason') or '').strip()
+    if not reject_reason:
+        return jsonify({'message': '拒绝理由不能为空'}), 400
+    applicant = User.query.get_or_404(application.user_id)
+    application.status = 'rejected'
+    application.review_time = datetime.now()
+    application.reviewer_id = current_admin.id
+    application.reject_reason = reject_reason
     db.session.commit()
-    
-    # 通知教师审核被拒绝
-    reject_msg = f'很抱歉，您的教师注册申请未通过审核。'
-    if reason:
-        reject_msg += f' 原因：{reason}'
     create_notification(
-        teacher.id,
-        '注册审核未通过',
-        reject_msg,
+        applicant.id,
+        '管理员申请未通过',
+        f'您的管理员申请未通过，理由：{reject_reason}。24 小时后可重新申请。',
         'error'
     )
-    
-    return jsonify({
-        'message': '已拒绝',
-        'user': teacher.to_dict()
-    })
+    return jsonify(application.to_dict())
 
 @app.route('/api/admin/users/create', methods=['POST'])
 @jwt_required()
@@ -2384,7 +2462,6 @@ def admin_create_user():
         return jsonify({'message': '用户名已存在'}), 400
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'message': '邮箱已被注册'}), 400
-    identity = (data.get('identity') or 'student').strip()
     user = User(
         username=data['username'],
         email=data['email'],
@@ -2394,15 +2471,9 @@ def admin_create_user():
         class_name=data.get('class_name', ''),
         student_id=data.get('student_id', ''),
         gender=data.get('gender', ''),
-        role='user',
-        user_type=identity,
-        staff_id=data.get('staff_id', '')
+        role=ROLE_USER
     )
     user.set_password(data['password'])
-    if identity == 'teacher':
-        user.role = 'admin'
-        user.admin_level = 'mid'
-        user.admin_appointed_by = None
     db.session.add(user)
     db.session.commit()
     return jsonify(user.to_dict()), 201
@@ -2436,6 +2507,7 @@ def admin_delete_user(user_id):
 
         # 删除通知
         Notification.query.filter_by(user_id=target.id).delete()
+        AdminApplication.query.filter_by(user_id=target.id).delete()
 
         # 删除会话及其消息（对话设置了 cascade）
         conversations = Conversation.query.filter(
@@ -2541,49 +2613,60 @@ def admin_delete_item(item_id):
         traceback.print_exc()
         return jsonify({'message': f'服务器错误: {str(e)}'}), 500
 
-@app.route('/api/admin/appoint', methods=['POST'])
+@app.route('/api/admin/users/<int:user_id>/appoint-admin', methods=['POST'])
 @jwt_required()
-def admin_appoint():
+def admin_appoint_user(user_id):
     current_admin = get_current_user()
-    if not admin_required():
-        return jsonify({'message': 'forbidden'}), 403
-    data = request.json
-    target_id = int(data.get('target_user_id') or 0)
-    level = data.get('level')
-    if level not in ['low','mid']:
-        return jsonify({'message': '无效等级'}), 400
-    if current_admin and target_id == current_admin.id:
-        return jsonify({'message': 'forbidden'}), 403
-    if not can_appoint_level(current_admin, level):
-        return jsonify({'message': 'forbidden'}), 403
-    target = User.query.get_or_404(target_id)
-    if is_admin_user(target):
-        return jsonify({'message': '已是管理员，不能重复任命'}), 400
-    target.role = 'admin'
-    target.admin_level = level
-    target.admin_appointed_by = current_admin.id
-    db.session.commit()
-    return jsonify(target.to_dict())
-
-@app.route('/api/admin/revoke', methods=['POST'])
-@jwt_required()
-def admin_revoke():
-    current_admin = get_current_user()
-    if not admin_required():
-        return jsonify({'message': 'forbidden'}), 403
-    data = request.json
-    target_id = int(data.get('target_user_id') or 0)
-    target = User.query.get_or_404(target_id)
+    target = User.query.get_or_404(user_id)
     if current_admin and target.id == current_admin.id:
         return jsonify({'message': 'forbidden'}), 403
-    if not can_revoke(current_admin, target):
+    if not can_appoint_admin(current_admin, target):
         return jsonify({'message': 'forbidden'}), 403
-    if target.admin_appointed_by and target.admin_appointed_by != current_admin.id:
-        return jsonify({'message': 'forbidden'}), 403
-    target.role = 'user'
-    target.admin_level = None
-    target.admin_appointed_by = None
+    target.role = ROLE_ADMIN
+    application = AdminApplication(
+        user_id=target.id,
+        reason='高级管理员直接任命',
+        status='approved',
+        apply_time=datetime.now(),
+        review_time=datetime.now(),
+        reviewer_id=current_admin.id
+    )
+    db.session.add(application)
     db.session.commit()
+    create_notification(
+        target.id,
+        '管理员任命',
+        '您已被高级管理员直接任命为管理员。',
+        'success'
+    )
+    return jsonify(target.to_dict())
+
+@app.route('/api/admin/users/<int:user_id>/revoke-admin', methods=['POST'])
+@jwt_required()
+def admin_revoke_user(user_id):
+    current_admin = get_current_user()
+    target = User.query.get_or_404(user_id)
+    if current_admin and target.id == current_admin.id:
+        return jsonify({'message': 'forbidden'}), 403
+    if not can_revoke_admin(current_admin, target):
+        return jsonify({'message': 'forbidden'}), 403
+    target.role = ROLE_USER
+    application = AdminApplication(
+        user_id=target.id,
+        reason='高级管理员撤销管理员身份',
+        status='revoked',
+        apply_time=datetime.now(),
+        review_time=datetime.now(),
+        reviewer_id=current_admin.id
+    )
+    db.session.add(application)
+    db.session.commit()
+    create_notification(
+        target.id,
+        '管理员身份已撤销',
+        '您的管理员身份已被高级管理员撤销。24 小时后可重新申请。',
+        'warning'
+    )
     return jsonify(target.to_dict())
 
 
@@ -3597,7 +3680,7 @@ def export_data():
 def admin_export_data():
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
-    if not user or user.role != 'admin' or not user.admin_level:
+    if not is_admin_user(user):
         return jsonify({'message': 'forbidden'}), 403
 
     wb = Workbook()
@@ -3605,31 +3688,22 @@ def admin_export_data():
     # ---- Sheet 1: 用户 ----
     ws_users = wb.active
     ws_users.title = "用户"
-    ws_users.append(['ID', '用户名', '邮箱', '手机号', '身份类型', '院系', '年级', '班级',
-                     '学号', '工号', '性别', '角色', '管理员等级', '是否封禁',
-                     '教师审核状态', '注册时间'])
+    ws_users.append(['ID', '用户名', '邮箱', '手机号', '院系', '年级', '班级',
+                     '学号', '性别', '角色', '是否封禁', '注册时间'])
     gender_map = {'male': '男', 'female': '女', 'other': '其他', 'secret': '不透露'}
-    role_map = {'admin': '管理员', 'user': '普通用户'}
-    level_map = {'low': '低级', 'mid': '中级', 'high': '高级'}
-    user_type_map = {'student': '学生', 'teacher': '教师'}
-    approval_map = {'pending': '待审核', 'approved': '已通过', 'rejected': '已拒绝'}
     for u in User.query.order_by(User.created_at.desc()).all():
         ws_users.append([
             u.id,
             u.username,
             u.email,
             u.phone or '',
-            user_type_map.get(u.user_type, u.user_type or ''),
             u.department or '',
             u.grade or '',
             u.class_name or '',
             u.student_id or '',
-            u.staff_id or '',
             gender_map.get(u.gender, '未填写'),
-            role_map.get(u.role, u.role or ''),
-            level_map.get(u.admin_level, '无'),
+            role_text(u.role),
             '是' if u.is_banned else '否',
-            approval_map.get(u.teacher_approval_status, '') if u.user_type == 'teacher' else '',
             u.created_at.strftime('%Y-%m-%d %H:%M:%S') if u.created_at else ''
         ])
 
@@ -3690,20 +3764,26 @@ def admin_export_data():
     ws_stats.append(['已解决数量', Item.query.filter_by(status='closed').count()])
     ws_stats.append(['未处理举报', Report.query.filter_by(status='open').count()])
 
-    # ---- Sheet 5: 教师审核（仅高级管理员）----
-    if user.admin_level == 'high':
-        ws_teachers = wb.create_sheet("教师审核")
-        ws_teachers.append(['ID', '用户名', '邮箱', '工号', '院系', '审核状态', '注册时间'])
-        teachers = User.query.filter_by(user_type='teacher').order_by(User.created_at.desc()).all()
-        for t in teachers:
-            ws_teachers.append([
-                t.id,
-                t.username,
-                t.email,
-                t.staff_id or '',
-                t.department or '',
-                approval_map.get(t.teacher_approval_status, t.teacher_approval_status or ''),
-                t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else ''
+    # ---- Sheet 5: 管理员申请（仅高级管理员）----
+    if is_super_admin(user):
+        ws_apps = wb.create_sheet("管理员申请")
+        ws_apps.append(['ID', '申请人', '申请理由', '状态', '申请时间', '审核时间', '审核人', '拒绝理由'])
+        status_map_admin_application = {
+            'pending': '审核中',
+            'approved': '已通过',
+            'rejected': '已拒绝',
+            'revoked': '已撤销'
+        }
+        for application in AdminApplication.query.order_by(AdminApplication.apply_time.desc()).all():
+            ws_apps.append([
+                application.id,
+                application.user.username if application.user else '',
+                application.reason or '',
+                status_map_admin_application.get(application.status, application.status or ''),
+                application.apply_time.strftime('%Y-%m-%d %H:%M:%S') if application.apply_time else '',
+                application.review_time.strftime('%Y-%m-%d %H:%M:%S') if application.review_time else '',
+                application.reviewer.username if application.reviewer else '',
+                application.reject_reason or ''
             ])
 
     output = BytesIO()

@@ -11,7 +11,8 @@
           <span class="chat-title">
             {{ otherUser?.username }}
             <span v-if="otherUser?.is_banned" class="banned-label">（此用户已被管理员封禁）</span>
-            <el-tag v-if="otherUser?.role==='admin'" type="success" size="small" style="margin-left:8px">{{ levelText(otherUser?.admin_level) }}</el-tag>
+            <el-tag v-if="otherUser?.role==='super_admin'" type="warning" size="small" style="margin-left:8px">高级管理员</el-tag>
+            <el-tag v-else-if="otherUser?.role==='admin'" type="success" size="small" style="margin-left:8px">管理员</el-tag>
           </span>
           <el-button size="small" @click="loadMessages">
             <el-icon><Refresh /></el-icon>
@@ -153,8 +154,6 @@ const otherUser = ref(null);
 const socket = ref(null);
 const isConnected = ref(false);
 const isOtherUserTyping = ref(false);
-
-const levelText = (l) => ({ low: '低级', mid: '中级', high: '高级' }[l || ''] || '管理员')
 
 // 加载会话信息
 const loadConversation = async () => {
@@ -624,4 +623,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-const levelText = (l) => ({ low:'低级', mid:'中级', high:'高级' }[l] || '管理员')

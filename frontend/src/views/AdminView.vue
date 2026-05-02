@@ -33,13 +33,13 @@
           <el-option label="已解决" value="closed" />
         </el-select>
         <el-button type="primary" @click="load">刷新</el-button>
-        <el-button type="success" v-if="meLevel" @click="openCreateUser"
+        <el-button type="success" v-if="isAdmin" @click="openCreateUser"
           >创建用户</el-button
         >
-        <el-button type="success" v-if="meLevel" @click="openCreateItem"
+        <el-button type="success" v-if="isAdmin" @click="openCreateItem"
           >创建物品</el-button
         >
-        <el-button v-if="meLevel" @click="handleAdminExport">
+        <el-button v-if="isAdmin" @click="handleAdminExport">
           <el-icon><Download /></el-icon> 导出数据
         </el-button>
       </div>
@@ -48,25 +48,42 @@
         <p>查看平台基本统计数据</p>
       </div>
       <el-tabs v-model="tab">
-        <el-tab-pane label="教师审核" name="teachers" v-if="isAdmin && meLevel === 'high'">
-          <el-table :data="pendingTeachers" style="width: 100%">
+        <el-tab-pane label="管理员申请审核" name="applications" v-if="isSuperAdmin">
+          <el-radio-group v-model="applicationStatus" style="margin-bottom: 16px" @change="load">
+            <el-radio-button label="pending">审核中</el-radio-button>
+            <el-radio-button label="approved">已通过</el-radio-button>
+            <el-radio-button label="rejected">已拒绝</el-radio-button>
+          </el-radio-group>
+          <el-table :data="adminApplications" style="width: 100%">
             <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="username" label="用户名" />
-            <el-table-column prop="email" label="邮箱" />
-            <el-table-column prop="staff_id" label="工号" />
-            <el-table-column prop="department" label="院系" />
-            <el-table-column prop="created_at" label="注册时间" />
-            <el-table-column label="操作" width="200">
+            <el-table-column label="申请人" min-width="180">
+              <template #default="{ row }">
+                <div class="applicant-cell">
+                  <el-avatar :size="32" :src="row.user?.avatar_url ? absoluteUrl(row.user.avatar_url) : ''">
+                    {{ row.user?.username?.charAt(0) || 'U' }}
+                  </el-avatar>
+                  <span>{{ row.user?.username || ('用户#' + row.user_id) }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reason" label="申请理由" min-width="260" show-overflow-tooltip />
+            <el-table-column prop="apply_time" label="申请时间" min-width="170" />
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="applicationStatusType(row.status)">{{ applicationStatusText(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" v-if="applicationStatus === 'pending'">
               <template #default="{ row }">
                 <el-button
                   size="small"
                   type="success"
-                  @click="approveTeacher(row)"
-                >批准</el-button>
+                  @click="approveApplication(row)"
+                >通过</el-button>
                 <el-button
                   size="small"
                   type="danger"
-                  @click="rejectTeacher(row)"
+                  @click="rejectApplication(row)"
                 >拒绝</el-button>
               </template>
             </el-table-column>
@@ -79,9 +96,8 @@
             <el-table-column prop="email" label="邮箱" />
             <el-table-column label="角色">
               <template #default="{ row }">
-                <el-tag v-if="row.role === 'admin'" type="success"
-                  >管理员</el-tag
-                >
+                <el-tag v-if="row.role === 'super_admin'" type="warning">高级管理员</el-tag>
+                <el-tag v-else-if="row.role === 'admin'" type="success">管理员</el-tag>
                 <el-tag v-else>普通用户</el-tag>
                 <el-tag
                   v-if="row.is_banned"
@@ -89,11 +105,6 @@
                   style="margin-left: 6px"
                   >已封禁</el-tag
                 >
-              </template>
-            </el-table-column>
-            <el-table-column label="等级">
-              <template #default="{ row }">
-                {{ row.role === "admin" ? levelText(row.admin_level) : "无" }}
               </template>
             </el-table-column>
             <el-table-column label="操作" width="420">
@@ -116,23 +127,16 @@
                 <el-button
                   size="small"
                   type="warning"
-                  v-if="row.role !== 'admin' && canAppointLow && !isSelf(row)"
-                  @click="appoint(row, 'low')"
-                  >任命低级</el-button
-                >
-                <el-button
-                  size="small"
-                  type="warning"
-                  v-if="row.role !== 'admin' && canAppointMid && !isSelf(row)"
-                  @click="appoint(row, 'mid')"
-                  >任命中级</el-button
+                  v-if="isSuperAdmin && row.role === 'user' && !isSelf(row)"
+                  @click="appointAdmin(row)"
+                  >任命为管理员</el-button
                 >
                 <el-button
                   size="small"
                   type="danger"
-                  v-if="canRevoke(row) && !isSelf(row)"
-                  @click="revoke(row)"
-                  >解除任命</el-button
+                  v-if="isSuperAdmin && row.role === 'admin' && !isSelf(row)"
+                  @click="revokeAdmin(row)"
+                  >撤销管理员身份</el-button
                 >
                 <el-button
                   size="small"
@@ -430,9 +434,6 @@
         <el-descriptions-item label="角色">{{
           roleText(currentUser?.role)
         }}</el-descriptions-item>
-        <el-descriptions-item label="等级">{{
-          levelText(currentUser?.admin_level)
-        }}</el-descriptions-item>
         <el-descriptions-item label="加入时间">{{
           currentUser?.created_at
         }}</el-descriptions-item>
@@ -518,38 +519,29 @@
     </el-dialog>
     <el-dialog v-model="createUserDialog" title="创建用户" width="600px">
       <el-form :model="newUser" label-width="100px">
-        <el-form-item label="身份">
-          <el-select v-model="newUser.identity" placeholder="请选择">
-            <el-option label="学生" value="student" />
-            <el-option label="教师" value="teacher" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="newUser.identity==='teacher'" label="工号"><el-input v-model="newUser.staff_id" /></el-form-item>
         <el-form-item label="用户名"><el-input v-model="newUser.username" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="newUser.email" /></el-form-item>
         <el-form-item label="手机号"><el-input v-model="newUser.phone" /></el-form-item>
         <el-form-item label="密码"><el-input v-model="newUser.password" type="password" show-password /></el-form-item>
-        <template v-if="newUser.identity==='student'">
-          <el-form-item label="院系"><el-input v-model="newUser.department" /></el-form-item>
-          <el-form-item label="年级">
-            <el-select v-model="newUser.grade" placeholder="选择年级">
-              <el-option label="大一" value="大一" />
-              <el-option label="大二" value="大二" />
-              <el-option label="大三" value="大三" />
-              <el-option label="大四" value="大四" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="班级"><el-input v-model="newUser.class_name" /></el-form-item>
-          <el-form-item label="学号"><el-input v-model="newUser.student_id" /></el-form-item>
-          <el-form-item label="性别">
-            <el-select v-model="newUser.gender" placeholder="选择性别(可选)">
-              <el-option label="男" value="male" />
-              <el-option label="女" value="female" />
-              <el-option label="其他" value="other" />
-              <el-option label="不透露" value="secret" />
-            </el-select>
-          </el-form-item>
-        </template>
+        <el-form-item label="院系"><el-input v-model="newUser.department" /></el-form-item>
+        <el-form-item label="年级">
+          <el-select v-model="newUser.grade" placeholder="选择年级">
+            <el-option label="大一" value="大一" />
+            <el-option label="大二" value="大二" />
+            <el-option label="大三" value="大三" />
+            <el-option label="大四" value="大四" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="班级"><el-input v-model="newUser.class_name" /></el-form-item>
+        <el-form-item label="学号"><el-input v-model="newUser.student_id" /></el-form-item>
+        <el-form-item label="性别">
+          <el-select v-model="newUser.gender" placeholder="选择性别(可选)">
+            <el-option label="男" value="male" />
+            <el-option label="女" value="female" />
+            <el-option label="其他" value="other" />
+            <el-option label="不透露" value="secret" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="createUserDialog=false">取消</el-button>
@@ -629,7 +621,8 @@ const users = ref([]);
 const items = ref([]);
 const reports = ref([]);
 const stats = ref({});
-const pendingTeachers = ref([]);
+const adminApplications = ref([]);
+const applicationStatus = ref("pending");
 const keyword = ref("");
 const reportStatus = ref("");
 const itemStatus = ref("");
@@ -646,38 +639,28 @@ const evidenceImageIndices = ref({});
 // 管理员物品详情对话框中的当前图片索引
 const currentAdminImageIndex = ref(0);
 const me = getUser();
-const isAdmin = computed(() => me?.role === 'admin');
-const meLevel = me?.admin_level || "";
+const isAdmin = computed(() => me?.role === "admin" || me?.role === "super_admin");
+const isSuperAdmin = computed(() => me?.role === "super_admin");
 const meId = me?.id || 0;
-const canAppointLow = computed(() => meLevel === "mid" || meLevel === "high");
-const canAppointMid = computed(() => meLevel === "high");
-const canDeleteItem = computed(() => meLevel === "mid" || meLevel === "high");
+const canDeleteItem = computed(() => isAdmin.value);
 const isSelf = (row) => row?.id === meId;
 const canDelete = (row) => {
-  if (!meLevel) return false;
-  if (row.role === "admin" && row.admin_level) {
-    const r = { low: 1, mid: 2, high: 3 };
-    return r[meLevel] > r[row.admin_level];
-  }
-  return meLevel !== "low";
-};
-const canRevoke = (row) => {
-  if (row.role !== "admin" || !row.admin_level) return false;
-  if (!row.admin_appointed_by || row.admin_appointed_by !== meId) return false;
-  if (row.admin_level === "low") return meLevel === "mid" || meLevel === "high";
-  if (row.admin_level === "mid") return meLevel === "high";
-  return false;
+  if (!isAdmin.value || row.role === "super_admin") return false;
+  if (row.role === "admin") return isSuperAdmin.value;
+  return true;
 };
 const categoryText = (c) =>
   c === "lost" ? "失物" : c === "found" ? "拾物" : c || "";
 const statusText = (s) => (s === "closed" ? "已解决" : "进行中");
 const roleText = (r) =>
-  r === "admin" ? "管理员" : r === "banned" ? "已封禁" : "普通用户";
+  r === "super_admin" ? "高级管理员" : r === "admin" ? "管理员" : r === "banned" ? "已封禁" : "普通用户";
 const genderText = (g) =>
   ({ male: "男", female: "女", other: "其他", secret: "不透露" }[g] ||
   "未填写");
-const levelText = (l) =>
-  ({ low: "低级", mid: "中级", high: "高级" }[l] || "无");
+const applicationStatusText = (status) =>
+  ({ pending: "审核中", approved: "已通过", rejected: "已拒绝", revoked: "已撤销" }[status] || status);
+const applicationStatusType = (status) =>
+  ({ pending: "warning", approved: "success", rejected: "danger", revoked: "info" }[status] || "info");
 const statText = (k) =>
   ({
     users: "用户总数",
@@ -759,8 +742,10 @@ const filteredStats = computed(() => {
 const load = async () => {
   try {
     if (isAdmin.value) {
-      if (tab.value === "teachers" && meLevel === "high") {
-        pendingTeachers.value = await request.get("/admin/teachers/pending");
+      if (tab.value === "applications" && isSuperAdmin.value) {
+        adminApplications.value = await request.get("/admin-application", {
+          params: { status: applicationStatus.value },
+        });
       }
       if (tab.value === "users") users.value = await request.get("/admin/users");
       if (tab.value === "items") items.value = await request.get("/admin/items");
@@ -815,28 +800,35 @@ const updateItemStatus = async (row, status) => {
   await request.put(`/admin/items/${row.id}/status`, { status });
   await load();
 };
-const approveTeacher = async (teacher) => {
+const approveApplication = async (application) => {
   try {
-    await request.post(`/admin/teachers/${teacher.id}/approve`)
-    ElMessage.success('已批准教师注册')
+    await ElMessageBox.confirm('确认通过该管理员申请？', '通过申请', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await request.post(`/admin-application/${application.id}/approve`)
+    ElMessage.success('已通过管理员申请')
     await load()
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '操作失败')
+    if (error !== 'cancel') ElMessage.error(error?.response?.data?.message || '操作失败')
   }
 }
 
-const rejectTeacher = async (teacher) => {
+const rejectApplication = async (application) => {
   try {
-    await ElMessageBox.prompt('请输入拒绝原因（可选）', '拒绝教师注册', {
+    await ElMessageBox.prompt('请输入拒绝理由', '拒绝管理员申请', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       inputType: 'textarea',
-      inputPlaceholder: '拒绝原因...'
+      inputPlaceholder: '拒绝理由...',
+      inputValidator: (value) => Boolean((value || '').trim()),
+      inputErrorMessage: '拒绝理由不能为空'
     }).then(async ({ value }) => {
-      await request.post(`/admin/teachers/${teacher.id}/reject`, {
-        reason: value || ''
+      await request.post(`/admin-application/${application.id}/reject`, {
+        reject_reason: value.trim()
       })
-      ElMessage.success('已拒绝教师注册')
+      ElMessage.success('已拒绝管理员申请')
       await load()
     }).catch(() => {
       // 用户取消
@@ -922,12 +914,24 @@ const handleStatusChange = async (row, newValue) => {
   row.status = newValue;
   await updateReportStatus(row, newValue);
 };
-const appoint = async (row, level) => {
-  await request.post("/admin/appoint", { target_user_id: row.id, level });
+const appointAdmin = async (row) => {
+  await ElMessageBox.confirm(`确认将 ${row.username} 任命为管理员？`, '任命管理员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  });
+  await request.post(`/admin/users/${row.id}/appoint-admin`);
+  ElMessage.success('已任命为管理员');
   await load();
 };
-const revoke = async (row) => {
-  await request.post("/admin/revoke", { target_user_id: row.id });
+const revokeAdmin = async (row) => {
+  await ElMessageBox.confirm(`确认撤销 ${row.username} 的管理员身份？`, '撤销管理员身份', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  });
+  await request.post(`/admin/users/${row.id}/revoke-admin`);
+  ElMessage.success('已撤销管理员身份');
   await load();
 };
 const deleteUser = async (row) => {
@@ -942,8 +946,6 @@ const deleteItem = async (row) => {
 const createUserDialog = ref(false);
 const createItemDialog = ref(false);
 const newUser = ref({
-  identity: "student",
-  staff_id: "",
   username: "",
   email: "",
   phone: "",
@@ -975,8 +977,6 @@ const submitCreateUser = async () => {
   await request.post("/admin/users/create", newUser.value);
   createUserDialog.value = false;
   newUser.value = {
-    identity: "student",
-    staff_id: "",
     username: "",
     email: "",
     phone: "",
@@ -1133,6 +1133,12 @@ const handleAdminExport = async () => {
   gap: 1rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
+}
+
+.applicant-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .user-stats-header {

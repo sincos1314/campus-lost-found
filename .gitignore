@@ -12,6 +12,9 @@ frontend/.env.production
 frontend/.env.development
 frontend/.env.local
 
+outputs/
+tmp/
+
 deploy/
 
 *.log
@@ -27,3 +30,5 @@ Thumbs.db
 .claude/
 .idea/
 *.local
+
+定稿_基于Flask+Vue的校园失物招领系统的设计与实现.pdf
